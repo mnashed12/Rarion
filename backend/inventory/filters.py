@@ -89,6 +89,9 @@ class InventoryItemFilter(django_filters.FilterSet):
     card = django_filters.NumberFilter(
         help_text="Filter by card ID"
     )
+    deck = django_filters.NumberFilter(
+        help_text="Filter by deck ID"
+    )
     card_name = django_filters.CharFilter(
         field_name='card__name',
         lookup_expr='icontains',
@@ -144,7 +147,7 @@ class InventoryItemFilter(django_filters.FilterSet):
     class Meta:
         model = InventoryItem
         fields = [
-            'card', 'card_name', 'set_code', 'condition', 'condition_in',
+            'card', 'deck', 'card_name', 'set_code', 'condition', 'condition_in',
             'min_quantity', 'max_quantity', 'min_price', 'max_price',
             'location', 'sku', 'in_stock'
         ]

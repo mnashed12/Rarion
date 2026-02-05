@@ -76,6 +76,25 @@ export const InventoryConditionDisplay: Record<InventoryCondition, string> = {
 }
 
 /**
+ * Prestige levels for cards in decks
+ */
+export enum Prestige {
+  COMMON = 'common',
+  UNCOMMON = 'uncommon',
+  RARE = 'rare',
+  EPIC = 'epic',
+  LEGENDARY = 'legendary',
+}
+
+export const PrestigeDisplay: Record<Prestige, string> = {
+  [Prestige.COMMON]: 'Common',
+  [Prestige.UNCOMMON]: 'Uncommon',
+  [Prestige.RARE]: 'Rare',
+  [Prestige.EPIC]: 'Epic',
+  [Prestige.LEGENDARY]: 'Legendary',
+}
+
+/**
  * Stream platforms
  */
 export enum StreamPlatform {
@@ -148,6 +167,11 @@ export interface Card {
   card_type_display?: string
   image: string | null
   image_url: string | null
+  price_market: string | null
+  price_low: string | null
+  price_mid: string | null
+  price_high: string | null
+  price_updated_at: string | null
   created_at: string
   updated_at: string
 }
@@ -171,6 +195,7 @@ export interface CardSummary {
   set_code: string
   rarity: CardRarity
   card_type: CardType
+  image?: string | null
 }
 
 /**
@@ -194,6 +219,8 @@ export interface InventoryItem {
   card_detail?: CardSummary
   condition: InventoryCondition
   condition_display?: string
+  prestige: string
+  prestige_display?: string
   quantity: number
   purchase_price: string | null
   current_price: string | null
@@ -202,6 +229,8 @@ export interface InventoryItem {
   location: string
   notes: string
   sku: string
+  auction_code: string
+  sold_at: string | null
   created_at: string
   updated_at: string
 }
@@ -412,4 +441,15 @@ export interface StreamFilters {
   search?: string
   ordering?: string
   page?: number
+}
+
+/**
+ * Deck type
+ */
+export interface Deck {
+  id: number;
+  name: string;
+  owner: number;
+  created_at: string;
+  updated_at: string;
 }

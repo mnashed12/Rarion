@@ -10,6 +10,7 @@ from decimal import Decimal
 from django.db import models
 from django.core.validators import MinValueValidator
 from django.utils import timezone
+from django.contrib.auth import get_user_model
 
 
 class PokemonSet(models.Model):
@@ -106,11 +107,46 @@ class Card(models.Model):
         default=CardType.POKEMON,
         help_text="Type of card (Pokemon, Trainer, or Energy)"
     )
-    image = models.ImageField(
-        upload_to='card_images/%Y/%m/',
+    image = models.URLField(
+        max_length=500,
         null=True,
         blank=True,
-        help_text="Card image (uploaded to S3 in production)"
+        help_text="Card image URL (CDN or uploaded to S3 in production)"
+    )
+    
+    # Pricing fields from TCGdex (TCGplayer data)
+    price_market = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="TCGplayer market price in USD"
+    )
+    price_low = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="TCGplayer low price in USD"
+    )
+    price_mid = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="TCGplayer mid price in USD"
+    )
+    price_high = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="TCGplayer high price in USD"
+    )
+    price_updated_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the price was last updated from TCGdex"
     )
     
     # Timestamps
@@ -149,6 +185,14 @@ class InventoryItem(models.Model):
         HEAVILY_PLAYED = 'heavily_played', 'Heavily Played'
         DAMAGED = 'damaged', 'Damaged'
     
+    # Prestige choices
+    class Prestige(models.TextChoices):
+        COMMON = 'common', 'Common'
+        UNCOMMON = 'uncommon', 'Uncommon'
+        RARE = 'rare', 'Rare'
+        EPIC = 'epic', 'Epic'
+        LEGENDARY = 'legendary', 'Legendary'
+    
     card = models.ForeignKey(
         Card,
         on_delete=models.CASCADE,
@@ -160,6 +204,12 @@ class InventoryItem(models.Model):
         choices=Condition.choices,
         default=Condition.NEAR_MINT,
         help_text="Physical condition of the card(s)"
+    )
+    prestige = models.CharField(
+        max_length=20,
+        choices=Prestige.choices,
+        default=Prestige.COMMON,
+        help_text="Prestige level of the card in this deck"
     )
     quantity = models.PositiveIntegerField(
         default=1,
@@ -197,6 +247,27 @@ class InventoryItem(models.Model):
         editable=False,
         help_text="Auto-generated unique Stock Keeping Unit"
     )
+    deck = models.ForeignKey(
+        'Deck',
+        on_delete=models.CASCADE,
+        related_name='inventory_items',
+        null=True,
+        blank=True,
+        help_text="The deck this inventory item belongs to (optional)"
+    )
+    
+    # Auction/Sale fields
+    auction_code = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+        help_text="Unique code for QR/barcode scanning during auctions"
+    )
+    sold_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp when the item was sold/removed from auction"
+    )
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -207,11 +278,12 @@ class InventoryItem(models.Model):
         ordering = ['-created_at']
         verbose_name = 'Inventory Item'
         verbose_name_plural = 'Inventory Items'
-        # Each card + condition combination should be unique
-        unique_together = ['card', 'condition']
+        # Each card + condition + deck combination should be unique
+        unique_together = ['card', 'condition', 'deck']
         indexes = [
             models.Index(fields=['sku'], name='inventory_sku_idx'),
             models.Index(fields=['condition'], name='inventory_condition_idx'),
+            models.Index(fields=['auction_code'], name='inventory_auction_idx'),
         ]
     
     def save(self, *args, **kwargs):
@@ -340,3 +412,31 @@ class StreamInventory(models.Model):
     
     def __str__(self):
         return f"{self.inventory_item.card.name} in {self.stream_event.title}"
+
+
+class Deck(models.Model):
+    """
+    Represents a deck that can contain multiple inventory items.
+    Used to organize cards into different collections/decks.
+    """
+    name = models.CharField(
+        max_length=100,
+        help_text="Name of the deck"
+    )
+    owner = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.CASCADE,
+        related_name='decks',
+        help_text="User who owns this deck"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'decks'
+        ordering = ['name']
+        verbose_name = 'Deck'
+        verbose_name_plural = 'Decks'
+
+    def __str__(self):
+        return self.name

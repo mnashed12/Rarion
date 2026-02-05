@@ -8,6 +8,14 @@ incoming data for the API endpoints.
 from rest_framework import serializers
 from django.utils import timezone
 from .models import PokemonSet, Card, InventoryItem, StreamEvent, StreamInventory
+from .models import Deck
+
+
+class DeckSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Deck
+        fields = ['id', 'name', 'owner', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'owner', 'created_at', 'updated_at']
 
 
 class PokemonSetSerializer(serializers.ModelSerializer):
@@ -96,6 +104,11 @@ class CardSerializer(serializers.ModelSerializer):
             'card_type_display',
             'image',
             'image_url',
+            'price_market',
+            'price_low',
+            'price_mid',
+            'price_high',
+            'price_updated_at',
             'created_at',
             'updated_at',
         ]
@@ -103,11 +116,12 @@ class CardSerializer(serializers.ModelSerializer):
     
     def get_image_url(self, obj):
         """Return the full URL for the card image."""
+        # Image field stores external CDN URLs
         if obj.image:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.image.url)
-            return obj.image.url
+            # If URL doesn't have extension, append /high.webp for TCGdex URLs
+            if 'tcgdex.net' in obj.image and not obj.image.endswith(('.jpg', '.png', '.webp')):
+                return obj.image + '/high.webp'
+            return obj.image
         return None
     
     def validate_card_number(self, value):
@@ -148,7 +162,7 @@ class CardListSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Card
-        fields = ['id', 'name', 'card_number', 'set_name', 'set_code', 'rarity', 'card_type']
+        fields = ['id', 'name', 'card_number', 'set_name', 'set_code', 'rarity', 'card_type', 'image']
 
 
 class InventoryItemSerializer(serializers.ModelSerializer):
@@ -166,11 +180,22 @@ class InventoryItemSerializer(serializers.ModelSerializer):
         source='get_condition_display',
         read_only=True
     )
+    prestige_display = serializers.CharField(
+        source='get_prestige_display',
+        read_only=True
+    )
     total_value = serializers.SerializerMethodField(
         help_text="Total value based on quantity * current_price"
     )
     profit_margin = serializers.SerializerMethodField(
         help_text="Profit/loss based on purchase vs current price"
+    )
+    deck = DeckSerializer(read_only=True)
+    deck_id = serializers.PrimaryKeyRelatedField(
+        queryset=Deck.objects.all(),
+        source='deck',
+        write_only=True,
+        required=False
     )
     
     class Meta:
@@ -181,6 +206,8 @@ class InventoryItemSerializer(serializers.ModelSerializer):
             'card_detail',
             'condition',
             'condition_display',
+            'prestige',
+            'prestige_display',
             'quantity',
             'purchase_price',
             'current_price',
@@ -189,10 +216,14 @@ class InventoryItemSerializer(serializers.ModelSerializer):
             'location',
             'notes',
             'sku',
+            'deck',
+            'deck_id',
+            'auction_code',
+            'sold_at',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'sku', 'created_at', 'updated_at', 'total_value', 'profit_margin']
+        read_only_fields = ['id', 'sku', 'auction_code', 'created_at', 'updated_at', 'total_value', 'profit_margin']
     
     def get_total_value(self, obj):
         """Calculate total value of inventory item."""

@@ -14,6 +14,7 @@ from .views import (
     InventoryItemViewSet,
     StreamEventViewSet,
     StreamInventoryViewSet,
+    DeckViewSet,
 )
 
 # Create router and register viewsets
@@ -26,6 +27,7 @@ router.register(r'cards', CardViewSet, basename='card')
 router.register(r'inventory', InventoryItemViewSet, basename='inventoryitem')
 router.register(r'streams', StreamEventViewSet, basename='streamevent')
 router.register(r'stream-inventory', StreamInventoryViewSet, basename='streaminventory')
+router.register(r'decks', DeckViewSet, basename='deck')
 
 # App name for URL namespacing
 app_name = 'inventory'

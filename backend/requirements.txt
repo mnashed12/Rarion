@@ -28,3 +28,10 @@ django-filter==23.5
 
 # Additional utilities
 python-dateutil==2.8.2
+
+# QR Code generation
+qrcode==7.4.2
+
+# Pokemon TCG API SDK
+pokemontcgsdk==3.6.0
+requests==2.31.0

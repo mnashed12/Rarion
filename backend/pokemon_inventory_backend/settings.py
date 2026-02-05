@@ -219,7 +219,7 @@ CORS_ALLOW_CREDENTIALS = True
 # Allowed origins from environment variable
 CORS_ALLOWED_ORIGINS = [
     origin.strip()
-    for origin in os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000').split(',')
+    for origin in os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://localhost:3001').split(',')
     if origin.strip()
 ]
 

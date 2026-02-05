@@ -125,7 +125,7 @@ export default apiClient
 /**
  * Helper to build query string from filter object
  */
-export function buildQueryString(filters: Record<string, unknown>): string {
+export function buildQueryString<T extends object>(filters: T): string {
   const params = new URLSearchParams()
   
   Object.entries(filters).forEach(([key, value]) => {
