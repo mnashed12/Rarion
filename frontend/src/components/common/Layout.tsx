@@ -59,44 +59,37 @@ function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Header - Pokemon themed gradient */}
+      {/* Header - Rarion themed gradient */}
       <header 
         className={`
           sticky top-0 z-50 
           transition-all duration-300
           ${scrolled 
-            ? 'shadow-lg shadow-blue-900/20' 
+            ? 'shadow-lg shadow-purple-900/30' 
             : ''
           }
         `}
         style={{
-          background: 'linear-gradient(180deg, #1D2C5E 0%, #3B5CA8 100%)'
+          background: 'linear-gradient(135deg, #0c1844 0%, #1e40af 25%, #7c3aed 60%, #ec4899 100%)'
         }}
       >
         {/* Top accent bar */}
-        <div className="h-1 bg-gradient-to-r from-red-500 via-yellow-400 to-red-500" />
+        <div className="h-1 bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500" />
         
         <div className="px-4 sm:px-6 lg:px-10 xl:px-16 2xl:px-24">
           <div className="flex justify-between items-center h-16 sm:h-18">
             {/* Logo */}
-            <Link to="/" className="flex items-center gap-3 min-w-0 group">
-              {/* Pokeball-style logo */}
-              <div className="relative w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0">
-                <div className="absolute inset-0 rounded-full bg-gradient-to-b from-red-500 to-red-600 shadow-lg overflow-hidden">
-                  <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-white" />
-                  <div className="absolute top-1/2 left-0 right-0 h-1 bg-gray-800 -translate-y-1/2" />
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full border-4 border-gray-800" />
-                </div>
-                <div className="absolute inset-0 rounded-full bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <div className="flex flex-col">
-                <span className="font-black text-xl sm:text-2xl text-white tracking-tight">
-                  PAKMAK
-                </span>
-                <span className="text-[10px] sm:text-xs text-blue-200 font-medium -mt-1 hidden sm:block">
-                  Card Inventory Tracker
-                </span>
-              </div>
+            <Link to="/" className="flex items-end gap-1.5 min-w-0 group">
+              <img 
+                src="/RarionLogoPlainnobg.png" 
+                alt="Rarion" 
+                className="h-18 sm:h-18 w-auto object-contain transition-transform group-hover:scale-105"
+              />
+              <img 
+                src="/rariontext.png" 
+                alt="Rarion" 
+                className="h-4 sm:h-6 w-auto object-contain pb-1"
+              />
             </Link>
 
             {/* Desktop Navigation */}
@@ -113,8 +106,8 @@ function Layout({ children }: LayoutProps) {
                       flex items-center gap-2 px-4 py-2.5 rounded-xl
                       text-sm font-semibold transition-all duration-200
                       ${isActive 
-                        ? 'bg-white/20 text-white shadow-lg' 
-                        : 'text-blue-100 hover:text-white hover:bg-white/10'
+                        ? 'bg-white/20 text-white shadow-lg shadow-purple-500/20' 
+                        : 'text-purple-100 hover:text-white hover:bg-white/10'
                       }
                     `}
                   >
@@ -143,7 +136,7 @@ function Layout({ children }: LayoutProps) {
             ${mobileMenuOpen ? 'max-h-80 opacity-100' : 'max-h-0 opacity-0'}
           `}
           style={{
-            background: 'linear-gradient(180deg, #3B5CA8 0%, #2D4A8C 100%)'
+            background: 'linear-gradient(180deg, #7c3aed 0%, #1e40af 100%)'
           }}
         >
           <nav className="px-4 pb-4 pt-2 space-y-1">
@@ -160,13 +153,13 @@ function Layout({ children }: LayoutProps) {
                     transition-all duration-200
                     ${isActive 
                       ? 'bg-white/20 text-white font-semibold' 
-                      : 'text-blue-100 hover:bg-white/10 hover:text-white'
+                      : 'text-purple-100 hover:bg-white/10 hover:text-white'
                     }
                   `}
                 >
                   <Icon className="w-5 h-5" />
                   <span>{item.label}</span>
-                  {isActive && <Sparkles className="w-4 h-4 ml-auto text-yellow-400" />}
+                  {isActive && <Sparkles className="w-4 h-4 ml-auto text-pink-400" />}
                 </Link>
               )
             })}
@@ -185,11 +178,11 @@ function Layout({ children }: LayoutProps) {
         </div>
       </main>
 
-      {/* Mobile Bottom Navigation - Pokemon themed */}
+      {/* Mobile Bottom Navigation - Rarion themed */}
       <nav 
-        className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t-2 border-blue-900/30"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t-2 border-purple-900/30"
         style={{
-          background: 'linear-gradient(180deg, #1D2C5E 0%, #0F1A3D 100%)'
+          background: 'linear-gradient(180deg, #1e40af 0%, #0c1844 100%)'
         }}
       >
         <div className="flex justify-around items-center h-16 px-2 pb-safe">
@@ -206,8 +199,8 @@ function Layout({ children }: LayoutProps) {
                   py-2 px-4 rounded-xl min-w-[68px]
                   transition-all duration-200
                   ${isActive 
-                    ? 'text-yellow-400' 
-                    : 'text-blue-300 hover:text-white'
+                    ? 'text-pink-400' 
+                    : 'text-purple-300 hover:text-white'
                   }
                 `}
               >
@@ -217,7 +210,7 @@ function Layout({ children }: LayoutProps) {
                 `}>
                   <Icon className={`w-6 h-6 ${isActive ? 'scale-110' : ''} transition-transform`} />
                   {isActive && (
-                    <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
+                    <div className="absolute -top-1 -right-1 w-2 h-2 bg-pink-400 rounded-full animate-pulse" />
                   )}
                 </div>
                 <span className={`text-xs mt-1 ${isActive ? 'font-bold' : 'font-medium'}`}>
@@ -234,14 +227,14 @@ function Layout({ children }: LayoutProps) {
         <div className="px-4 sm:px-6 lg:px-10 xl:px-16 2xl:px-24">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-b from-red-500 to-red-600 relative overflow-hidden shadow-lg">
-                <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-white" />
-                <div className="absolute top-1/2 left-0 right-0 h-1 bg-gray-800 -translate-y-1/2" />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full border-2 border-gray-800" />
-              </div>
+              <img 
+                src="/RarionLogo_no_bg.png" 
+                alt="Rarion" 
+                className="h-10 w-auto object-contain"
+              />
               <div>
                 <span className="text-sm font-bold text-white">
-                  PAKMAK
+                  Rarion
                 </span>
                 <p className="text-xs text-gray-400">
                   © {new Date().getFullYear()} Pokemon Card Inventory

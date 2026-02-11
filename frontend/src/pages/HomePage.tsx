@@ -194,7 +194,6 @@ function HomePage() {
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-2">
             <div className="flex items-center gap-1.5 px-3 py-1 bg-yellow-400/20 rounded-full">
-              <Sparkles className="w-4 h-4 text-yellow-400" />
               <span className="text-xs font-bold text-yellow-300 uppercase tracking-wider">Welcome Trainer!</span>
             </div>
           </div>
@@ -250,7 +249,6 @@ function HomePage() {
             bgColor="bg-blue-200"
             link="/inventory"
             loading={inventoryLoading}
-            hoverEffect={<Bubbles count={50} />}
           />
           <StatCard
             title="Total Value"
@@ -260,7 +258,6 @@ function HomePage() {
             backgroundImage="/charmander.png"
             backgroundSize="15%"
             bgColor="bg-red-200"
-            hoverEffect={<FlameBeam />}
           />
           <StatCard
             title="Streams"
@@ -280,13 +277,6 @@ function HomePage() {
         className="relative overflow-hidden rounded-2xl border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 via-amber-50 to-orange-50 p-6 sm:p-8 animate-slide-down"
         style={{ animationDelay: '150ms' }}
       >
-        {/* Decorative sparkles */}
-        <div className="absolute top-4 right-4">
-          <Sparkles className="w-8 h-8 text-yellow-400/40" />
-        </div>
-        <div className="absolute bottom-4 left-4">
-          <Sparkles className="w-6 h-6 text-orange-400/30" />
-        </div>
         
         <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <div className="flex-1">
