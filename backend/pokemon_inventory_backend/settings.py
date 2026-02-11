@@ -76,10 +76,13 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'pokemon_inventory_backend.urls'
 
+# Frontend build directory
+FRONTEND_DIR = BASE_DIR.parent / 'frontend' / 'dist'
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [FRONTEND_DIR],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -161,8 +164,11 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Additional static files directories
 STATICFILES_DIRS = [
-    BASE_DIR / 'static',
-] if (BASE_DIR / 'static').exists() else []
+    d for d in [
+        BASE_DIR / 'static',
+        FRONTEND_DIR,
+    ] if d.exists()
+]
 
 
 # =============================================================================
