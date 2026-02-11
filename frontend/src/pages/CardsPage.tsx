@@ -507,14 +507,14 @@ function CardsPage() {
                   >
                     <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
                       <img
-                        src={card.image_url || card.image || '/placeholder-card.svg'}
+                        src={card.image_url || card.image || '/images/placeholder-card.svg'}
                         alt={card.name}
                         className="w-full h-full object-contain"
                         loading="lazy"
                         onError={(e) => {
                           const img = e.target as HTMLImageElement
-                          if (!img.src.endsWith('/placeholder-card.svg')) {
-                            img.src = '/placeholder-card.svg'
+                          if (!img.src.endsWith('/images/placeholder-card.svg')) {
+                            img.src = '/images/placeholder-card.svg'
                           }
                         }}
                       />
@@ -542,7 +542,7 @@ function CardsPage() {
                     <div 
                       className="w-full h-full p-2 relative"
                       style={{
-                        backgroundImage: 'url(/cardback.jpg)',
+                        backgroundImage: 'url(/images/cardback.jpg)',
                         backgroundSize: 'cover',
                         backgroundPosition: 'center'
                       }}
@@ -555,7 +555,7 @@ function CardsPage() {
                         <div 
                           className="w-full h-full rounded-lg flex flex-col overflow-hidden relative"
                           style={{
-                            backgroundImage: 'url(/cardback.jpg)',
+                            backgroundImage: 'url(/images/cardback.jpg)',
                             backgroundSize: 'cover',
                             backgroundPosition: 'center'
                           }}
@@ -741,7 +741,7 @@ function CardsPage() {
               {/* Card Preview */}
               <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-gray-50 to-white rounded-2xl border-2 border-gray-100 mb-5">
                 <img
-                  src={modal.card.image_url || modal.card.image || '/placeholder-card.svg'}
+                  src={modal.card.image_url || modal.card.image || '/images/placeholder-card.svg'}
                   alt={modal.card.name}
                   className="w-20 h-28 object-contain rounded-lg shadow-md"
                 />

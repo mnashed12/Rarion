@@ -167,7 +167,7 @@ function HomePage() {
             value={cardsData?.toLocaleString() || '--'}
             subtitle="In database"
             gradient="bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700"
-            backgroundImage="/bulbasaur.png"
+            backgroundImage="/images/bulbasaur.png"
             backgroundSize="40%"
             bgColor="bg-green-200"
             link="/cards"
@@ -178,7 +178,7 @@ function HomePage() {
             value={inventoryData?.toLocaleString() || '--'}
             subtitle="Cards owned"
             gradient="bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700"
-            backgroundImage="/squirtle.png"
+            backgroundImage="/images/squirtle.png"
             backgroundSize="25%"
             bgColor="bg-blue-200"
             link="/inventory"
@@ -189,7 +189,7 @@ function HomePage() {
             value="$--"
             subtitle="Estimated"
             gradient="bg-gradient-to-br from-purple-500 via-purple-600 to-violet-700"
-            backgroundImage="/charmander.png"
+            backgroundImage="/images/charmander.png"
             backgroundSize="15%"
             bgColor="bg-red-200"
           />
@@ -198,7 +198,7 @@ function HomePage() {
             value="--"
             subtitle="Events recorded"
             gradient="bg-gradient-to-br from-orange-500 via-orange-600 to-red-600"
-            backgroundImage="/pikachu.png"
+            backgroundImage="/images/pikachu.png"
             backgroundSize="40%"
             bgColor="bg-yellow-200"
             link="/streams"

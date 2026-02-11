@@ -81,12 +81,12 @@ function Layout({ children }: LayoutProps) {
             {/* Logo */}
             <Link to="/" className="flex items-end gap-1.5 min-w-0 group">
               <img 
-                src="/RarionLogoPlainnobg.png" 
+                src="/images/RarionLogoPlainnobg.png" 
                 alt="Rarion" 
                 className="h-18 sm:h-18 w-auto object-contain transition-transform group-hover:scale-105"
               />
               <img 
-                src="/rariontext.png" 
+                src="/images/rariontext.png" 
                 alt="Rarion" 
                 className="h-4 sm:h-6 w-auto object-contain pb-1"
               />
@@ -228,7 +228,7 @@ function Layout({ children }: LayoutProps) {
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-3">
               <img 
-                src="/RarionLogo_no_bg.png" 
+                src="/images/RarionLogo_no_bg.png" 
                 alt="Rarion" 
                 className="h-10 w-auto object-contain"
               />
