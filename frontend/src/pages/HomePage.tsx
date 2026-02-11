@@ -9,77 +9,11 @@
 import { Link } from 'react-router-dom'
 import { 
   ArrowRight,
-  Sparkles,
-  Zap,
   Search,
   Plus
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import apiClient from '../services/api'
-
-/**
- * Bubble generator component for water effects
- */
-function Bubbles({ count = 40 }: { count?: number }) {
-  const bubbles = Array.from({ length: count }, (_, i) => {
-    const size = Math.random() * 15 + 10 // 10-25px
-    const top = Math.random() * 100 // 0-100%
-    const right = Math.random() * 20 + 5 // 5-25%
-    const delay = Math.random() * 0.5 // 0-0.5s
-    
-    return (
-      <div
-        key={i}
-        className={`bubble bubble-${(i % 20) + 1}`}
-        style={{
-          width: size,
-          height: size,
-          top: `${top}%`,
-          right: `${right}%`,
-          animationDelay: `${delay}s`
-        }}
-      />
-    )
-  })
-  
-  return <>{bubbles}</>
-}
-
-/**
- * Ember/flame generator component for fire effects
- */
-function Embers({ count = 40 }: { count?: number }) {
-  const embers = Array.from({ length: count }, (_, i) => {
-    const width = Math.random() * 20 + 15 // 15-35px
-    const height = width * (1.3 + Math.random() * 0.4) // 1.3-1.7x taller
-    const bottom = Math.random() * 30 // 0-30% from bottom
-    const right = Math.random() * 25 + 5 // 5-30%
-    const delay = Math.random() * 0.8 // 0-0.8s
-    
-    return (
-      <div
-        key={i}
-        className="flame"
-        style={{
-          width: width,
-          height: height,
-          bottom: `${bottom}%`,
-          right: `${right}%`,
-          animationDelay: `${delay}s`
-        }}
-      />
-    )
-  })
-  
-  return <>{embers}</>
-}
-
-/**
- * Clean gradient flame beam effect
- */
-function FlameBeam() {
-  return <div className="flame-beam" />
-}
 
 /**
  * Pokemon-themed stat card with gradient and decorative elements

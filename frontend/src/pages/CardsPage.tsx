@@ -31,7 +31,8 @@ interface AddToInventoryModal {
 /**
  * Get Pokemon type color class
  */
-function getTypeColor(type: string | undefined): string {
+// @ts-ignore: keeping for future use
+function _getTypeColor(type: string | undefined): string {
   const colors: Record<string, string> = {
     'fire': 'from-orange-500 to-red-600',
     'water': 'from-blue-400 to-blue-600',
@@ -485,7 +486,6 @@ function CardsPage() {
           {cards.map((card) => {
             const rarityStyle = getRarityStyle(card.rarity)
             const isRare = rarityStyle.glow
-            const typeGradient = getTypeColor(card.card_type)
             
             return (
               <div
