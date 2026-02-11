@@ -4,30 +4,30 @@
 # All versions are pinned for reproducibility
 
 # Core Django
-Django==5.0.1
-djangorestframework==3.14.0
+Django>=5.0,<5.2
+djangorestframework>=3.14,<4.0
 
 # CORS handling for React frontend
-django-cors-headers==4.3.1
+django-cors-headers>=4.3,<5.0
 
 # PostgreSQL adapter
-psycopg2-binary==2.9.9
+psycopg2-binary>=2.9,<3.0
 
 # Environment variable management
-python-dotenv==1.0.0
+python-dotenv>=1.0,<2.0
 
 # Image processing
-Pillow==10.2.0
+Pillow>=10.2,<11.0
 
 # AWS S3 integration
-boto3==1.34.25
-django-storages==1.14.2
+boto3>=1.34,<2.0
+django-storages>=1.14,<2.0
 
 # API filtering
-django-filter==23.5
+django-filter>=23.5,<25.0
 
 # Additional utilities
-python-dateutil==2.8.2
+python-dateutil>=2.8,<3.0
 
 # QR Code generation
 qrcode==7.4.2
