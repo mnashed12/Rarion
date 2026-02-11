@@ -272,7 +272,7 @@ function HomePage() {
         </div>
       </div>
 
-      {/* Getting Started Card */}
+      {/* Getting Started Card  */}
       <div 
         className="relative overflow-hidden rounded-2xl border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 via-amber-50 to-orange-50 p-6 sm:p-8 animate-slide-down"
         style={{ animationDelay: '150ms' }}

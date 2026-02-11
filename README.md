@@ -50,7 +50,7 @@ A full-stack web application for tracking Pokemon card inventory, designed to ev
 ## 📁 Project Structure
 
 ```
-pakmak/
+rarion/
 ├── .gitignore                 # Git ignore rules for Django & React
 ├── README.md                  # This file
 ├── backend/                   # Django backend
@@ -186,7 +186,7 @@ Ensure you have the following installed:
 
 ```bash
 git clone <repository-url>
-cd pakmak
+cd rarion
 ```
 
 ### 2. Backend Setup
