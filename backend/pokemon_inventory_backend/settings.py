@@ -35,7 +35,7 @@ DEBUG = os.getenv('DEBUG', 'False').lower() in ('true', '1', 'yes')
 # Allowed hosts configuration
 ALLOWED_HOSTS = [
     host.strip() 
-    for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+    for host in os.getenv('ALLOWED_HOSTS', 'rarion.pythonanywhere.com,rarion.io,www.rarion.io,localhost,127.0.0.1').split(',')
     if host.strip()
 ]
 
