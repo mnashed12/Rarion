@@ -31,7 +31,7 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Html5Qrcode } from 'html5-qrcode'
-import apiClient from '../services/api'
+import apiClient, { API_BASE_URL } from '../services/api'
 import type { InventoryItem, Deck } from '../types'
 import { Toast, ConfirmModal, type ToastType } from '../components/common'
 
@@ -654,7 +654,7 @@ function InventoryPage() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          window.open(`http://127.0.0.1:8000/api/decks/${deck.id}/print_labels/`, '_blank')
+                          window.open(`${API_BASE_URL}/decks/${deck.id}/print_labels/`, '_blank')
                         }}
                         className={`
                           p-1.5 rounded-lg transition-all
