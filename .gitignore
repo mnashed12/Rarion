@@ -19,7 +19,9 @@ __pycache__/
 .Python
 build/
 develop-eggs/
+# Ignore Python dist but not frontend/dist
 dist/
+!frontend/dist/
 downloads/
 eggs/
 .eggs/
@@ -160,7 +162,6 @@ coverage/
 
 # Production build
 build/
-dist/
 
 # Misc
 .DS_Store
