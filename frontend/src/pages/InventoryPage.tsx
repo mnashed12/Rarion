@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { 
   Package, 
   Plus, 
@@ -63,6 +64,7 @@ function InventoryPage() {
   const [scannerDeck, setScannerDeck] = useState<Deck | null>(null)
   const [lastSoldCard, setLastSoldCard] = useState<{ name: string; auction_code: string } | null>(null)
   const scannerRef = useRef<Html5Qrcode | null>(null)
+  const queryClient = useQueryClient()
 
 
   // Fun loading messages for import
@@ -290,6 +292,8 @@ function InventoryPage() {
       setInventory(prev => prev.map(item => 
         item.auction_code === code ? { ...item, sold_at: new Date().toISOString() } : item
       ))
+      // Invalidate the homepage recent-scans cache so it refreshes immediately
+      queryClient.invalidateQueries({ queryKey: ['recent-scans'] })
     } catch (error: any) {
       const errorMsg = error.response?.data?.error || 'Failed to mark as sold'
       setToast({ message: errorMsg, type: 'error' })

@@ -36,6 +36,11 @@ app_name = 'inventory'
 urlpatterns = [
     # Include all router-generated URLs
     path('', include(router.urls)),
+    
+    # Explicit routes for QR scan actions (belt-and-suspenders alongside router)
+    path('inventory/recent_scans/', InventoryItemViewSet.as_view({'get': 'recent_scans'}), name='inventory-recent-scans'),
+    path('inventory/sell_by_code/', InventoryItemViewSet.as_view({'post': 'sell_by_code'}), name='inventory-sell-by-code'),
+    path('inventory/unsell_by_code/', InventoryItemViewSet.as_view({'post': 'unsell_by_code'}), name='inventory-unsell-by-code'),
 ]
 
 # =============================================================================

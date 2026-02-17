@@ -245,6 +245,29 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
         }
         return Response(stats)
     
+    @action(detail=False, methods=['get'])
+    def recent_scans(self, request):
+        """
+        Get the most recently scanned/sold cards.
+        
+        Returns inventory items that have been sold (sold_at is not null),
+        ordered by most recently sold first.
+        
+        Query params:
+        - limit: Number of items to return (default 20, max 100)
+        """
+        limit = min(int(request.query_params.get('limit', 20)), 100)
+        
+        recent = (
+            InventoryItem.objects
+            .select_related('card', 'card__pokemon_set', 'deck')
+            .filter(sold_at__isnull=False)
+            .order_by('-sold_at')[:limit]
+        )
+        
+        serializer = self.get_serializer(recent, many=True)
+        return Response(serializer.data)
+    
     @action(detail=True, methods=['post'])
     def adjust_quantity(self, request, pk=None):
         """
