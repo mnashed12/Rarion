@@ -205,7 +205,7 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
     serializer_class = InventoryItemSerializer
     filterset_class = InventoryItemFilter
     search_fields = ['sku', 'card__name', 'location', 'notes', 'card__pokemon_set__name']
-    ordering_fields = ['created_at', 'quantity', 'current_price', 'condition', 'card__name']
+    ordering_fields = ['created_at', 'quantity', 'current_price', 'condition', 'card__name', 'prestige']
     ordering = ['-created_at']
     
     def perform_create(self, serializer):

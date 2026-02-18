@@ -111,6 +111,10 @@ class InventoryItemFilter(django_filters.FilterSet):
         choices=InventoryItem.Condition.choices,
         help_text="Filter by multiple conditions"
     )
+    prestige = django_filters.ChoiceFilter(
+        choices=InventoryItem.Prestige.choices,
+        help_text="Filter by prestige level"
+    )
     min_quantity = django_filters.NumberFilter(
         field_name='quantity',
         lookup_expr='gte',
@@ -149,7 +153,7 @@ class InventoryItemFilter(django_filters.FilterSet):
         fields = [
             'card', 'deck', 'card_name', 'set_code', 'condition', 'condition_in',
             'min_quantity', 'max_quantity', 'min_price', 'max_price',
-            'location', 'sku', 'in_stock'
+            'location', 'sku', 'in_stock', 'prestige'
         ]
     
     def filter_in_stock(self, queryset, name, value):

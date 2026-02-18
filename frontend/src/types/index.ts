@@ -437,6 +437,17 @@ export interface StreamFilters {
 }
 
 /**
+ * Prestige stats returned per deck (unsold cards only)
+ */
+export interface DeckPrestigeStats {
+  total: number;
+  star: number;
+  galaxy: number;
+  cosmos: number;
+  rarion: number;
+}
+
+/**
  * Deck type
  */
 export interface Deck {
@@ -445,4 +456,5 @@ export interface Deck {
   owner: number;
   created_at: string;
   updated_at: string;
+  prestige_stats?: DeckPrestigeStats;
 }

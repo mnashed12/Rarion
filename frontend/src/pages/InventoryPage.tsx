@@ -28,7 +28,10 @@ import {
   FolderPlus,
   Printer,
   QrCode,
-  Undo2
+  Undo2,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Html5Qrcode } from 'html5-qrcode'
@@ -43,6 +46,10 @@ function InventoryPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [conditionFilter, setConditionFilter] = useState<string>('')
+  const [prestigeFilter, setPrestigeFilter] = useState<string>('')
+  const [minPrice, setMinPrice] = useState<string>('')
+  const [maxPrice, setMaxPrice] = useState<string>('')
+  const [ordering, setOrdering] = useState<string>('')
   const [showFilters, setShowFilters] = useState(false)
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
@@ -86,8 +93,14 @@ function InventoryPage() {
   useEffect(() => {
     const fetchDecks = async () => {
       try {
-        const response = await apiClient.get('/decks/')
-        const fetchedDecks = response.data.results || response.data
+        const [deckRes, statsRes] = await Promise.all([
+          apiClient.get('/decks/'),
+          apiClient.get('/inventory/prestige_by_deck/'),
+        ])
+        const fetchedDecks = mergePrestigeStats(
+          deckRes.data.results || deckRes.data,
+          statsRes.data
+        )
         setDecks(fetchedDecks)
         // Auto-select first deck if available
         if (fetchedDecks.length > 0 && !selectedDeck) {
@@ -114,6 +127,10 @@ function InventoryPage() {
         const params = new URLSearchParams()
         if (searchTerm) params.append('search', searchTerm)
         if (conditionFilter) params.append('condition', conditionFilter)
+        if (prestigeFilter) params.append('prestige', prestigeFilter)
+        if (minPrice) params.append('min_price', minPrice)
+        if (maxPrice) params.append('max_price', maxPrice)
+        if (ordering) params.append('ordering', ordering)
         params.append('deck', selectedDeck.id.toString())
         params.append('page', page.toString())
         params.append('page_size', ITEMS_PER_PAGE.toString())
@@ -129,7 +146,7 @@ function InventoryPage() {
     }
 
     fetchInventory()
-  }, [searchTerm, conditionFilter, page, selectedDeck])
+  }, [searchTerm, conditionFilter, prestigeFilter, minPrice, maxPrice, ordering, page, selectedDeck])
 
   // Fetch deck stats (separate from pagination)
   useEffect(() => {
@@ -197,6 +214,8 @@ function InventoryPage() {
         const statsResponse = await apiClient.get(`/inventory/stats/?deck=${deckId}`)
         setDeckStats(statsResponse.data)
       }
+      // Refresh all deck prestige stats (bars on cards update live)
+      await refreshDecks()
       
       // Auto-close after showing results
       setTimeout(() => {
@@ -214,6 +233,21 @@ function InventoryPage() {
         type: 'error' 
       })
     }
+  }
+
+  // Merge prestige stats from /inventory/prestige_by_deck/ into a deck list
+  const mergePrestigeStats = (deckList: Deck[], statsMap: Record<number, { star: number; galaxy: number; cosmos: number; rarion: number; total: number }>): Deck[] =>
+    deckList.map(d => ({ ...d, prestige_stats: statsMap[d.id] ?? { star: 0, galaxy: 0, cosmos: 0, rarion: 0, total: 0 } }))
+
+  // Refresh decks list and keep selectedDeck in sync (so prestige bars update)
+  const refreshDecks = async () => {
+    const [deckRes, statsRes] = await Promise.all([
+      apiClient.get('/decks/'),
+      apiClient.get('/inventory/prestige_by_deck/'),
+    ])
+    const fresh = mergePrestigeStats(deckRes.data.results || deckRes.data, statsRes.data)
+    setDecks(fresh)
+    setSelectedDeck(prev => prev ? (fresh.find(d => d.id === prev.id) ?? prev) : prev)
   }
 
   // Handle creating a new deck
@@ -273,12 +307,13 @@ function InventoryPage() {
     setScannerDeck(null)
     setLastSoldCard(null)
     
-    // Refresh inventory if we're viewing this deck
+    // Refresh inventory + deck prestige stats when scanner closes
     if (selectedDeck) {
       setPage(1)
       const statsResponse = await apiClient.get(`/inventory/stats/?deck=${selectedDeck.id}`)
       setDeckStats(statsResponse.data)
     }
+    await refreshDecks()
   }
 
   // Handle successful QR scan
@@ -295,6 +330,8 @@ function InventoryPage() {
       ))
       // Invalidate the homepage recent-scans cache so it refreshes immediately
       queryClient.invalidateQueries({ queryKey: ['recent-scans'] })
+      // Refresh deck prestige stats (a card was sold, pull rates change live)
+      await refreshDecks()
     } catch (error: any) {
       const errorMsg = error.response?.data?.error || 'Failed to mark as sold'
       setToast({ message: errorMsg, type: 'error' })
@@ -309,6 +346,8 @@ function InventoryPage() {
       const response = await apiClient.post('/inventory/auto_assign_prestige/', body)
       const { updated, total } = response.data
       setToast({ message: `Prestige updated: ${updated} of ${total} cards reassigned`, type: 'success' })
+      // Refresh deck prestige stats (pull rate bars update)
+      await refreshDecks()
       // Refresh inventory
       const params = new URLSearchParams()
       if (selectedDeck) params.append('deck', selectedDeck.id.toString())
@@ -388,19 +427,21 @@ function InventoryPage() {
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE)
 
   const conditionLabels: Record<string, string> = {
-    NM: 'Near Mint',
-    LP: 'Lightly Played',
-    MP: 'Mod. Played',
-    HP: 'Heavily Played',
-    DMG: 'Damaged'
+    mint: 'Mint',
+    near_mint: 'Near Mint',
+    lightly_played: 'Lightly Played',
+    moderately_played: 'Mod. Played',
+    heavily_played: 'Heavily Played',
+    damaged: 'Damaged'
   }
 
   const conditionColors: Record<string, string> = {
-    NM: 'bg-gradient-to-r from-emerald-400 to-emerald-500 text-white',
-    LP: 'bg-gradient-to-r from-blue-400 to-blue-500 text-white',
-    MP: 'bg-gradient-to-r from-yellow-400 to-amber-500 text-white',
-    HP: 'bg-gradient-to-r from-orange-400 to-orange-500 text-white',
-    DMG: 'bg-gradient-to-r from-red-400 to-red-500 text-white'
+    mint: 'bg-gradient-to-r from-teal-400 to-teal-500 text-white',
+    near_mint: 'bg-gradient-to-r from-emerald-400 to-emerald-500 text-white',
+    lightly_played: 'bg-gradient-to-r from-blue-400 to-blue-500 text-white',
+    moderately_played: 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black',
+    heavily_played: 'bg-gradient-to-r from-orange-400 to-orange-500 text-white',
+    damaged: 'bg-gradient-to-r from-red-500 to-red-600 text-white'
   }
 
   const prestigeColors: Record<string, string> = {
@@ -722,9 +763,40 @@ function InventoryPage() {
                       </h3>
                     </div>
 
+                    {/* Prestige Pull Rate Bars */}
+                    <div className="relative z-10 mt-auto w-full space-y-1 pb-1">
+                      {(['star', 'galaxy', 'cosmos', 'rarion'] as const).map((tier) => {
+                        const stats = deck.prestige_stats
+                        const count = stats?.[tier] ?? 0
+                        const total = stats?.total ?? 0
+                        const pct = total > 0 ? Math.round((count / total) * 100) : 0
+                        const isActive = selectedDeck?.id === deck.id
+                        const barBg = isActive ? 'bg-white/20' : 'bg-black/10'
+                        const fillColors: Record<string, string> = {
+                          star: isActive ? 'bg-white' : 'bg-gray-400',
+                          galaxy: isActive ? 'bg-blue-300' : 'bg-blue-500',
+                          cosmos: isActive ? 'bg-purple-300' : 'bg-purple-500',
+                          rarion: isActive ? 'bg-orange-300' : 'bg-orange-500',
+                        }
+                        return (
+                          <div key={tier} className="flex items-center gap-1">
+                            <div className={`flex-1 h-1.5 rounded-full ${barBg} overflow-hidden`}>
+                              <div
+                                className={`h-full rounded-full transition-all duration-700 ${fillColors[tier]}`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <span className={`text-[9px] font-bold w-6 text-right leading-none tabular-nums ${isActive ? 'text-white/80' : 'text-gray-400'}`}>
+                              {pct}%
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+
                     {/* Bottom badge */}
                     <div className={`
-                      relative z-10 mt-auto pt-2 text-xs font-bold
+                      relative z-10 pt-1 text-xs font-bold
                       ${selectedDeck?.id === deck.id ? 'text-emerald-100' : 'text-gray-500'}
                     `}>
                       {selectedDeck?.id === deck.id ? 'ACTIVE' : 'SELECT'}
@@ -800,7 +872,7 @@ function InventoryPage() {
               h-12 px-4 rounded-xl border-2
               text-sm font-bold
               transition-all active:scale-[0.98]
-              ${showFilters || conditionFilter
+              ${showFilters || conditionFilter || prestigeFilter || minPrice || maxPrice
                 ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 border-emerald-500 text-white'
                 : 'bg-white border-gray-100 text-gray-700 hover:border-gray-200'
               }
@@ -823,28 +895,84 @@ function InventoryPage() {
         {/* Filters Panel */}
         <div className={`
           overflow-hidden transition-all duration-300 ease-in-out
-          ${showFilters ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'}
+          ${showFilters ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}
         `}>
-          <div className="bg-gradient-to-br from-gray-50 to-white rounded-xl border-2 border-gray-100 p-4">
-            <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wide">Condition</label>
-            <select
-              className="
-                w-full h-11 px-3 bg-white border-2 border-gray-100 rounded-xl
-                text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-              "
-              value={conditionFilter}
-              onChange={(e) => {
-                setConditionFilter(e.target.value)
-                setPage(1)
-              }}
-            >
-              <option value="">All Conditions</option>
-              <option value="NM">Near Mint</option>
-              <option value="LP">Lightly Played</option>
-              <option value="MP">Moderately Played</option>
-              <option value="HP">Heavily Played</option>
-              <option value="DMG">Damaged</option>
-            </select>
+          <div className="bg-gradient-to-br from-gray-50 to-white rounded-xl border-2 border-gray-100 p-4 space-y-4">
+            {/* Condition pills */}
+            <div>
+              <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wide">Condition</label>
+              <div className="flex flex-wrap gap-2">
+                {[['', 'All'], ['near_mint', 'Near Mint'], ['lightly_played', 'Lightly Played'], ['moderately_played', 'Mod. Played'], ['heavily_played', 'Heavily Played'], ['damaged', 'Damaged']].map(([val, label]) => (
+                  <button
+                    key={val}
+                    onClick={() => { setConditionFilter(val); setPage(1) }}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold border-2 transition-all ${
+                      conditionFilter === val
+                        ? val === '' ? 'bg-gray-800 text-white border-gray-800' : `${conditionColors[val] || 'bg-gray-500 text-white'} border-transparent`
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Prestige pills */}
+            <div>
+              <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wide">Prestige</label>
+              <div className="flex flex-wrap gap-2">
+                {[['', 'All'], ['star', 'Star'], ['galaxy', 'Galaxy'], ['cosmos', 'Cosmos'], ['rarion', 'Rarion']].map(([val, label]) => (
+                  <button
+                    key={val}
+                    onClick={() => { setPrestigeFilter(val); setPage(1) }}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold border-2 transition-all ${
+                      prestigeFilter === val
+                        ? val === '' ? 'bg-gray-800 text-white border-gray-800' : `${prestigeColors[val] || 'bg-gray-500 text-white'} border-transparent`
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Price range */}
+            <div>
+              <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wide">Price Range</label>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">$</span>
+                  <input
+                    type="number"
+                    placeholder="Min"
+                    min="0"
+                    value={minPrice}
+                    onChange={(e) => { setMinPrice(e.target.value); setPage(1) }}
+                    className="w-full h-9 pl-7 pr-3 bg-white border-2 border-gray-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                </div>
+                <span className="text-gray-400 font-bold text-sm">—</span>
+                <div className="relative flex-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">$</span>
+                  <input
+                    type="number"
+                    placeholder="Max"
+                    min="0"
+                    value={maxPrice}
+                    onChange={(e) => { setMaxPrice(e.target.value); setPage(1) }}
+                    className="w-full h-9 pl-7 pr-3 bg-white border-2 border-gray-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                </div>
+                {(minPrice || maxPrice) && (
+                  <button
+                    onClick={() => { setMinPrice(''); setMaxPrice(''); setPage(1) }}
+                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -964,12 +1092,11 @@ function InventoryPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b-2 border-gray-100" style={{ background: 'linear-gradient(180deg, #f9fafb 0%, #f3f4f6 100%)' }}>
-                  <th className="text-left text-xs font-bold text-gray-600 uppercase tracking-wider px-5 py-4">Card</th>
-                  <th className="text-left text-xs font-bold text-gray-600 uppercase tracking-wider px-5 py-4">Set</th>
-                  <th className="text-center text-xs font-bold text-gray-600 uppercase tracking-wider px-5 py-4">Condition</th>
-                  <th className="text-center text-xs font-bold text-gray-600 uppercase tracking-wider px-5 py-4">
-                    <div className="flex items-center justify-center gap-2">
-                      Prestige
+                  {([
+                    { label: 'Card', field: 'card__name', align: 'left' },
+                    { label: 'Set', field: '', align: 'left' },
+                    { label: 'Condition', field: 'condition', align: 'center' },
+                    { label: 'Prestige', field: 'prestige', align: 'center', extra: (
                       <button
                         onClick={handleAutoAssignPrestige}
                         disabled={assigningPrestige}
@@ -978,11 +1105,43 @@ function InventoryPage() {
                       >
                         {assigningPrestige ? '...' : 'AUTO'}
                       </button>
-                    </div>
-                  </th>
-                  <th className="text-center text-xs font-bold text-gray-600 uppercase tracking-wider px-5 py-4">Qty</th>
-                  <th className="text-right text-xs font-bold text-gray-600 uppercase tracking-wider px-5 py-4">Price</th>
-                  <th className="text-right text-xs font-bold text-gray-600 uppercase tracking-wider px-5 py-4">Actions</th>
+                    )},
+                    { label: 'Qty', field: 'quantity', align: 'center' },
+                    { label: 'Price', field: 'current_price', align: 'right' },
+                    { label: 'Actions', field: '', align: 'right' },
+                  ] as { label: string; field: string; align: string; extra?: React.ReactNode }[]).map(({ label, field, align, extra }) => {
+                    const isActive = ordering === field || ordering === `-${field}`
+                    const isDesc = ordering === `-${field}`
+                    const handleSort = () => {
+                      if (!field) return
+                      if (ordering === field) setOrdering(`-${field}`)
+                      else if (ordering === `-${field}`) setOrdering('')
+                      else setOrdering(field)
+                      setPage(1)
+                    }
+                    return (
+                      <th
+                        key={label}
+                        onClick={field ? handleSort : undefined}
+                        className={`
+                          text-xs font-bold text-gray-600 uppercase tracking-wider px-5 py-4
+                          text-${align}
+                          ${field ? 'cursor-pointer select-none hover:bg-gray-100 transition-colors' : ''}
+                          ${isActive ? 'text-emerald-600' : ''}
+                        `}
+                      >
+                        <div className={`flex items-center gap-1 ${align === 'center' ? 'justify-center' : align === 'right' ? 'justify-end' : 'justify-start'}`}>
+                          {label}
+                          {extra}
+                          {field && (
+                            isActive
+                              ? (isDesc ? <ArrowDown className="w-3.5 h-3.5 text-emerald-500" /> : <ArrowUp className="w-3.5 h-3.5 text-emerald-500" />)
+                              : <ArrowUpDown className="w-3.5 h-3.5 text-gray-300" />
+                          )}
+                        </div>
+                      </th>
+                    )
+                  })}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -1059,8 +1218,10 @@ function InventoryPage() {
                         {item.quantity}
                       </span>
                     </td>
-                    <td className="px-5 py-4 text-right font-black text-emerald-600">
-                      ${parseFloat(item.current_price as any || 0).toFixed(2)}
+                    <td className="px-5 py-4 text-right">
+                      <span className="text-xl font-black text-emerald-600">
+                        ${parseFloat(item.current_price as any || 0).toFixed(2)}
+                      </span>
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
