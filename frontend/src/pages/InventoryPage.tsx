@@ -93,13 +93,18 @@ function InventoryPage() {
   useEffect(() => {
     const fetchDecks = async () => {
       try {
-        const [deckRes, statsRes] = await Promise.all([
+        const [deckRes, statsRes] = await Promise.allSettled([
           apiClient.get('/decks/'),
           apiClient.get('/inventory/prestige_by_deck/'),
         ])
+        if (deckRes.status === 'rejected') {
+          console.error('Error fetching decks:', deckRes.reason)
+          return
+        }
+        const statsData = statsRes.status === 'fulfilled' ? statsRes.value.data : {}
         const fetchedDecks = mergePrestigeStats(
-          deckRes.data.results || deckRes.data,
-          statsRes.data
+          deckRes.value.data.results || deckRes.value.data,
+          statsData
         )
         setDecks(fetchedDecks)
         // Auto-select first deck if available
@@ -201,6 +206,7 @@ function InventoryPage() {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: 300000, // 5 minutes for large CSV imports
       })
       
       const result = response.data
@@ -241,11 +247,13 @@ function InventoryPage() {
 
   // Refresh decks list and keep selectedDeck in sync (so prestige bars update)
   const refreshDecks = async () => {
-    const [deckRes, statsRes] = await Promise.all([
+    const [deckRes, statsRes] = await Promise.allSettled([
       apiClient.get('/decks/'),
       apiClient.get('/inventory/prestige_by_deck/'),
     ])
-    const fresh = mergePrestigeStats(deckRes.data.results || deckRes.data, statsRes.data)
+    if (deckRes.status === 'rejected') return
+    const statsData = statsRes.status === 'fulfilled' ? statsRes.value.data : {}
+    const fresh = mergePrestigeStats(deckRes.value.data.results || deckRes.value.data, statsData)
     setDecks(fresh)
     setSelectedDeck(prev => prev ? (fresh.find(d => d.id === prev.id) ?? prev) : prev)
   }

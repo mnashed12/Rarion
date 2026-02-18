@@ -279,31 +279,26 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
           Cosmos: $16–$75
           Rarion: $76+
 
-        Items with no price are left unchanged.
+        Items with no price or price < 1 are left unchanged.
         """
+        from django.db.models import Case, Value, When
         deck_id = request.data.get('deck_id')  # optional - limit to one deck
-        queryset = InventoryItem.objects.filter(current_price__isnull=False)
+        queryset = InventoryItem.objects.filter(current_price__gte=1)
         if deck_id:
             queryset = queryset.filter(deck_id=deck_id)
 
-        updated = 0
-        for item in queryset:
-            price = float(item.current_price)
-            if price >= 76:
-                new_prestige = 'rarion'
-            elif price >= 16:
-                new_prestige = 'cosmos'
-            elif price >= 6:
-                new_prestige = 'galaxy'
-            else:
-                new_prestige = 'star'
+        total = queryset.count()
 
-            if item.prestige != new_prestige:
-                item.prestige = new_prestige
-                item.save(update_fields=['prestige'])
-                updated += 1
+        updated = queryset.update(
+            prestige=Case(
+                When(current_price__gte=76, then=Value('rarion')),
+                When(current_price__gte=16, then=Value('cosmos')),
+                When(current_price__gte=6,  then=Value('galaxy')),
+                default=Value('star'),
+            )
+        )
 
-        return Response({'updated': updated, 'total': queryset.count()})
+        return Response({'updated': updated, 'total': total})
 
     @action(detail=True, methods=['post'])
     def adjust_quantity(self, request, pk=None):
