@@ -22,18 +22,26 @@ function HomePage() {
     retry: 1,
   })
 
+  const bgStyle = {
+    backgroundImage: `url(${import.meta.env.BASE_URL}images/151bg.jpg)`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+  }
+
   if (isLoading) {
     return (
-      <div className="fixed inset-0 z-40 bg-black flex items-center justify-center">
-        <div className="text-white/60 text-lg animate-pulse">Loading recent scans...</div>
+      <div className="fixed inset-0 z-40 flex items-center justify-center" style={bgStyle}>
+        <div className="absolute inset-0 bg-black/60" />
+        <div className="relative text-white/60 text-lg animate-pulse">Loading recent scans...</div>
       </div>
     )
   }
 
   if (isError) {
     return (
-      <div className="fixed inset-0 z-40 bg-black flex items-center justify-center">
-        <div className="text-center">
+      <div className="fixed inset-0 z-40 flex items-center justify-center" style={bgStyle}>
+        <div className="absolute inset-0 bg-black/60" />
+        <div className="relative text-center">
           <Package className="w-16 h-16 text-red-400/60 mx-auto mb-4" />
           <p className="text-red-400 text-lg">Failed to load recent scans</p>
           <p className="text-white/30 text-sm mt-2 font-mono">{String((error as any)?.message || error)}</p>
@@ -44,8 +52,9 @@ function HomePage() {
 
   if (recentCards.length === 0) {
     return (
-      <div className="fixed inset-0 z-40 bg-black flex items-center justify-center">
-        <div className="text-center">
+      <div className="fixed inset-0 z-40 flex items-center justify-center" style={bgStyle}>
+        <div className="absolute inset-0 bg-black/60" />
+        <div className="relative text-center">
           <Package className="w-16 h-16 text-white/20 mx-auto mb-4" />
           <p className="text-white/40 text-lg">No recently scanned cards</p>
           <p className="text-white/20 text-sm mt-2">Scan cards via QR to see them here</p>
@@ -55,17 +64,11 @@ function HomePage() {
   }
 
   return (
-    <div className="fixed inset-0 z-40 bg-black overflow-hidden">
-      {/* Title overlay */}
-      <div className="absolute top-6 left-6 z-10">
-        <h2 className="text-3xl font-black text-white mb-1">Recently Scanned</h2>
-        <p className="text-sm text-gray-400">
-          {recentCards.length} card{recentCards.length !== 1 ? 's' : ''} sold
-        </p>
-      </div>
+    <div className="fixed inset-0 z-40 overflow-hidden" style={bgStyle}>
+      <div className="absolute inset-0 bg-black/50" />
 
       {/* Scrolling cards container */}
-      <div className="h-full flex items-center overflow-hidden">
+      <div className="relative z-10 h-full flex items-center overflow-hidden">
         <div
           className="flex gap-6 px-6"
           style={{

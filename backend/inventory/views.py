@@ -267,7 +267,44 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
         
         serializer = self.get_serializer(recent, many=True)
         return Response(serializer.data)
-    
+
+    @action(detail=False, methods=['post'])
+    def auto_assign_prestige(self, request):
+        """
+        Automatically assign prestige levels to all inventory items based on current_price.
+
+        Rules:
+          Star:   $1–$5
+          Galaxy: $6–$15
+          Cosmos: $16–$75
+          Rarion: $76+
+
+        Items with no price are left unchanged.
+        """
+        deck_id = request.data.get('deck_id')  # optional - limit to one deck
+        queryset = InventoryItem.objects.filter(current_price__isnull=False)
+        if deck_id:
+            queryset = queryset.filter(deck_id=deck_id)
+
+        updated = 0
+        for item in queryset:
+            price = float(item.current_price)
+            if price >= 76:
+                new_prestige = 'rarion'
+            elif price >= 16:
+                new_prestige = 'cosmos'
+            elif price >= 6:
+                new_prestige = 'galaxy'
+            else:
+                new_prestige = 'star'
+
+            if item.prestige != new_prestige:
+                item.prestige = new_prestige
+                item.save(update_fields=['prestige'])
+                updated += 1
+
+        return Response({'updated': updated, 'total': queryset.count()})
+
     @action(detail=True, methods=['post'])
     def adjust_quantity(self, request, pk=None):
         """
@@ -787,7 +824,7 @@ class DeckViewSet(viewsets.ModelViewSet):
                     defaults={
                         'quantity': quantity,
                         'purchase_price': purchase_price,
-                        'current_price': market_price or card.price_market,
+                        'current_price': market_price,
                         'notes': f"Imported from CSV. Variation: {variation}" if variation else "Imported from CSV"
                     }
                 )

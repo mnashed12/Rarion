@@ -104,11 +104,6 @@ class CardSerializer(serializers.ModelSerializer):
             'card_type_display',
             'image',
             'image_url',
-            'price_market',
-            'price_low',
-            'price_mid',
-            'price_high',
-            'price_updated_at',
             'created_at',
             'updated_at',
         ]

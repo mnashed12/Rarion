@@ -114,41 +114,6 @@ class Card(models.Model):
         help_text="Card image URL (CDN or uploaded to S3 in production)"
     )
     
-    # Pricing fields from TCGdex (TCGplayer data)
-    price_market = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        help_text="TCGplayer market price in USD"
-    )
-    price_low = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        help_text="TCGplayer low price in USD"
-    )
-    price_mid = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        help_text="TCGplayer mid price in USD"
-    )
-    price_high = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        help_text="TCGplayer high price in USD"
-    )
-    price_updated_at = models.DateTimeField(
-        null=True,
-        blank=True,
-        help_text="When the price was last updated from TCGdex"
-    )
-    
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -187,11 +152,10 @@ class InventoryItem(models.Model):
     
     # Prestige choices
     class Prestige(models.TextChoices):
-        COMMON = 'common', 'Common'
-        UNCOMMON = 'uncommon', 'Uncommon'
-        RARE = 'rare', 'Rare'
-        EPIC = 'epic', 'Epic'
-        LEGENDARY = 'legendary', 'Legendary'
+        STAR = 'star', 'Star'
+        GALAXY = 'galaxy', 'Galaxy'
+        COSMOS = 'cosmos', 'Cosmos'
+        RARION = 'rarion', 'Rarion'
     
     card = models.ForeignKey(
         Card,
@@ -208,7 +172,7 @@ class InventoryItem(models.Model):
     prestige = models.CharField(
         max_length=20,
         choices=Prestige.choices,
-        default=Prestige.COMMON,
+        default=Prestige.STAR,
         help_text="Prestige level of the card in this deck"
     )
     quantity = models.PositiveIntegerField(

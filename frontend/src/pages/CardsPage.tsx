@@ -575,15 +575,6 @@ function CardsPage() {
                           
                           {/* Stats Content */}
                           <div className="relative z-10 flex-1 p-2 flex flex-col gap-1">
-                            {/* Price - Featured */}
-                            {card.price_market && (
-                              <div className="flex items-center justify-between rounded-lg px-2.5 py-1.5 bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30">
-                                <span className="text-[14px] font-bold text-green-700 uppercase">Price</span>
-                                <span className="text-[16px] font-black text-green-700">
-                                  ${parseFloat(card.price_market).toFixed(2)}
-                                </span>
-                              </div>
-                            )}
                             
                             {/* Set */}
                             <div className="flex items-center justify-between rounded-lg px-2.5 py-1">

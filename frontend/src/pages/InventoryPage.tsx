@@ -65,6 +65,7 @@ function InventoryPage() {
   const [lastSoldCard, setLastSoldCard] = useState<{ name: string; auction_code: string } | null>(null)
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const queryClient = useQueryClient()
+  const [assigningPrestige, setAssigningPrestige] = useState(false)
 
 
   // Fun loading messages for import
@@ -300,6 +301,28 @@ function InventoryPage() {
     }
   }
 
+  // Auto-assign prestige based on price
+  const handleAutoAssignPrestige = async () => {
+    setAssigningPrestige(true)
+    try {
+      const body = selectedDeck ? { deck_id: selectedDeck.id } : {}
+      const response = await apiClient.post('/inventory/auto_assign_prestige/', body)
+      const { updated, total } = response.data
+      setToast({ message: `Prestige updated: ${updated} of ${total} cards reassigned`, type: 'success' })
+      // Refresh inventory
+      const params = new URLSearchParams()
+      if (selectedDeck) params.append('deck', selectedDeck.id.toString())
+      params.append('page', page.toString())
+      params.append('page_size', '20')
+      const inv = await apiClient.get(`/inventory/?${params.toString()}`)
+      setInventory(inv.data.results || [])
+    } catch {
+      setToast({ message: 'Failed to assign prestige', type: 'error' })
+    } finally {
+      setAssigningPrestige(false)
+    }
+  }
+
   // Undo last sale
   const handleUndoSale = async () => {
     if (!lastSoldCard) return
@@ -381,11 +404,10 @@ function InventoryPage() {
   }
 
   const prestigeColors: Record<string, string> = {
-    common: 'bg-gradient-to-r from-gray-400 to-gray-500 text-black border-gray-400',
-    uncommon: 'bg-gradient-to-r from-slate-100 to-white text-black border-gray-300',
-    rare: 'bg-gradient-to-r from-blue-400 to-blue-500 text-black border-blue-400',
-    epic: 'bg-gradient-to-r from-purple-400 to-purple-500 text-black border-purple-400',
-    legendary: 'bg-gradient-to-r from-orange-400 to-orange-500 text-black border-orange-400'
+    star: 'bg-white text-black border-gray-300',
+    galaxy: 'bg-gradient-to-r from-blue-400 to-blue-500 text-white border-blue-400',
+    cosmos: 'bg-gradient-to-r from-purple-400 to-purple-500 text-white border-purple-400',
+    rarion: 'bg-gradient-to-r from-orange-400 to-orange-500 text-white border-orange-400'
   }
 
   return (
@@ -945,7 +967,19 @@ function InventoryPage() {
                   <th className="text-left text-xs font-bold text-gray-600 uppercase tracking-wider px-5 py-4">Card</th>
                   <th className="text-left text-xs font-bold text-gray-600 uppercase tracking-wider px-5 py-4">Set</th>
                   <th className="text-center text-xs font-bold text-gray-600 uppercase tracking-wider px-5 py-4">Condition</th>
-                  <th className="text-center text-xs font-bold text-gray-600 uppercase tracking-wider px-5 py-4">Prestige</th>
+                  <th className="text-center text-xs font-bold text-gray-600 uppercase tracking-wider px-5 py-4">
+                    <div className="flex items-center justify-center gap-2">
+                      Prestige
+                      <button
+                        onClick={handleAutoAssignPrestige}
+                        disabled={assigningPrestige}
+                        title="Auto-assign prestige based on price"
+                        className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {assigningPrestige ? '...' : 'AUTO'}
+                      </button>
+                    </div>
+                  </th>
                   <th className="text-center text-xs font-bold text-gray-600 uppercase tracking-wider px-5 py-4">Qty</th>
                   <th className="text-right text-xs font-bold text-gray-600 uppercase tracking-wider px-5 py-4">Price</th>
                   <th className="text-right text-xs font-bold text-gray-600 uppercase tracking-wider px-5 py-4">Actions</th>
@@ -1014,11 +1048,10 @@ function InventoryPage() {
                           ${prestigeColors[item.prestige] || 'bg-gray-100 text-gray-700 border-gray-200'}
                         `}
                       >
-                        <option value="common">Common</option>
-                        <option value="uncommon">Uncommon</option>
-                        <option value="rare">Rare</option>
-                        <option value="epic">Epic</option>
-                        <option value="legendary">Legendary</option>
+                        <option value="star">Star</option>
+                        <option value="galaxy">Galaxy</option>
+                        <option value="cosmos">Cosmos</option>
+                        <option value="rarion">Rarion</option>
                       </select>
                     </td>
                     <td className="px-5 py-4 text-center">
@@ -1456,7 +1489,7 @@ function InventoryPage() {
                     <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-full px-4">
                       <div className={`
                         inline-flex px-3 py-1.5 rounded-lg text-xs font-bold shadow-lg border-2 mx-auto
-                        ${prestigeColors[item.prestige] || prestigeColors.common}
+                        ${prestigeColors[item.prestige] || prestigeColors.star}
                       `}>
                         {item.prestige_display || item.prestige}
                       </div>

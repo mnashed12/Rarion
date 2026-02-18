@@ -59,23 +59,16 @@ function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Header - Rarion themed gradient */}
-      <header 
-        className={`
-          sticky top-0 z-50 
-          transition-all duration-300
-          ${scrolled 
-            ? 'shadow-lg shadow-purple-900/30' 
-            : ''
-          }
-        `}
-        style={{
+      {/* Header - transparent on homepage, gradient elsewhere */}
+      <header
+        className={`sticky top-0 z-50 transition-all duration-300 ${scrolled && location.pathname !== '/' ? 'shadow-lg shadow-purple-900/30' : ''}`}
+        style={location.pathname !== '/' ? {
           background: 'linear-gradient(135deg, #0c1844 0%, #1e40af 25%, #7c3aed 60%, #ec4899 100%)'
-        }}
+        } : undefined}
       >
-        {/* Top accent bar */}
-        <div className="h-1 bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500" />
-        
+        {location.pathname !== '/' && (
+          <div className="h-1 bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500" />
+        )}
         <div className="px-4 sm:px-6 lg:px-10 xl:px-16 2xl:px-24">
           <div className="flex justify-between items-center h-16 sm:h-18">
             {/* Logo */}
@@ -83,12 +76,12 @@ function Layout({ children }: LayoutProps) {
               <img 
                 src="/images/RarionLogoPlainnobg.png" 
                 alt="Rarion" 
-                className="h-18 sm:h-18 w-auto object-contain transition-transform group-hover:scale-105"
+                className={`w-auto object-contain transition-transform group-hover:scale-105 ${location.pathname === '/' ? 'mt-8 h-18 sm:h-24' : 'h-18 sm:h-18'}`}
               />
               <img 
                 src="/images/rariontext.png" 
                 alt="Rarion" 
-                className="h-4 sm:h-6 w-auto object-contain pb-1"
+                className={`w-auto object-contain pb-1 ${location.pathname === '/' ? 'mb-4 h-4 sm:h-10' : 'h-4 sm:h-6'}`}
               />
             </Link>
 
@@ -104,7 +97,8 @@ function Layout({ children }: LayoutProps) {
                     to={item.path}
                     className={`
                       flex items-center gap-2 px-4 py-2.5 rounded-xl
-                      text-sm font-semibold transition-all duration-200
+                      font-semibold transition-all duration-200
+                      ${location.pathname === '/' ? 'mt-10 text-lg' : 'text-sm'}
                       ${isActive 
                         ? 'bg-white/20 text-white shadow-lg shadow-purple-500/20' 
                         : 'text-purple-100 hover:text-white hover:bg-white/10'
