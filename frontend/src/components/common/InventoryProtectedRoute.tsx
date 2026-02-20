@@ -1,26 +1,17 @@
 import { ReactNode } from 'react'
+import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { LoginModal } from '../common/LoginModal'
-import { useNavigate } from 'react-router-dom'
 
 interface InventoryProtectedRouteProps {
   children: ReactNode
 }
 
 export function InventoryProtectedRoute({ children }: InventoryProtectedRouteProps) {
-  const { isInventoryAuthenticated, loginToInventory } = useAuth()
-  const navigate = useNavigate()
+  const { isInventoryAuthenticated } = useAuth()
 
   if (!isInventoryAuthenticated) {
-    return (
-      <LoginModal
-        title="Inventory Access Required"
-        description="Please enter the password to view inventory"
-        onSubmit={loginToInventory}
-        showClose={true}
-        onClose={() => navigate('/')}
-      />
-    )
+    // Silently redirect — nav item is hidden so only direct URL access gets here
+    return <Navigate to="/" replace />
   }
 
   return <>{children}</>

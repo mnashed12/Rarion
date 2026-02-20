@@ -9,6 +9,7 @@
 
 import { ReactNode, useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { useAuth } from '../../contexts/AuthContext'
 import { 
   Home, 
   CreditCard, 
@@ -16,7 +17,8 @@ import {
   Video, 
   Menu,
   X,
-  Sparkles
+  Sparkles,
+  Layers,
 } from 'lucide-react'
 
 interface LayoutProps {
@@ -29,12 +31,14 @@ interface LayoutProps {
 const navItems = [
   { path: '/', label: 'Home', icon: Home },
   { path: '/cards', label: 'Cards', icon: CreditCard },
+  { path: '/decks', label: 'Decks', icon: Layers },
   { path: '/inventory', label: 'Inventory', icon: Package },
   { path: '/streams', label: 'Streams', icon: Video },
 ]
 
 function Layout({ children }: LayoutProps) {
   const location = useLocation()
+  const { isInventoryAuthenticated } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
 
@@ -57,16 +61,24 @@ function Layout({ children }: LayoutProps) {
     return location.pathname.startsWith(path)
   }
 
+  // Admin-only nav items are hidden from regular visitors
+  const visibleNavItems = navItems.filter(item => {
+    if (item.path === '/inventory' || item.path === '/streams') {
+      return isInventoryAuthenticated
+    }
+    return true
+  })
+
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Header - transparent on homepage, gradient elsewhere */}
+      {/* Header - transparent on homepage + decks, gradient elsewhere */}
       <header
-        className={`sticky top-0 z-50 transition-all duration-300 ${scrolled && location.pathname !== '/' ? 'shadow-lg shadow-purple-900/30' : ''}`}
-        style={location.pathname !== '/' ? {
+        className={`sticky top-0 z-50 transition-all duration-300 ${scrolled && location.pathname !== '/' && location.pathname !== '/decks' ? 'shadow-lg shadow-purple-900/30' : ''}`}
+        style={location.pathname !== '/' && location.pathname !== '/decks' ? {
           background: 'linear-gradient(135deg, #0c1844 0%, #1e40af 25%, #7c3aed 60%, #ec4899 100%)'
         } : undefined}
       >
-        {location.pathname !== '/' && (
+        {location.pathname !== '/' && location.pathname !== '/decks' && (
           <div className="h-1 bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500" />
         )}
         <div className="px-4 sm:px-6 lg:px-10 xl:px-16 2xl:px-24">
@@ -87,7 +99,7 @@ function Layout({ children }: LayoutProps) {
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-2">
-              {navItems.map((item) => {
+              {visibleNavItems.map((item) => {
                 const Icon = item.icon
                 const isActive = isActivePath(item.path)
                 
@@ -134,7 +146,7 @@ function Layout({ children }: LayoutProps) {
           }}
         >
           <nav className="px-4 pb-4 pt-2 space-y-1">
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const Icon = item.icon
               const isActive = isActivePath(item.path)
               
@@ -161,11 +173,15 @@ function Layout({ children }: LayoutProps) {
         </div>
       </header>
 
-      {/* Main Content - Pokemon striped background */}
-      <main className="flex-1 pb-20 md:pb-8 pokemon-content-bg">
-        {/* Decorative pokeballs */}
-        <div className="pokeball-deco" style={{ top: '15%', left: '3%' }} />
-        <div className="pokeball-deco" style={{ top: '60%', right: '5%' }} />
+      {/* Main Content */}
+      <main className={`flex-1 pb-20 md:pb-8 ${location.pathname === '/decks' ? '' : 'pokemon-content-bg'}`}>
+        {/* Decorative pokeballs (hidden on decks — full-page bg image takes over) */}
+        {location.pathname !== '/decks' && (
+          <>
+            <div className="pokeball-deco" style={{ top: '15%', left: '3%' }} />
+            <div className="pokeball-deco" style={{ top: '60%', right: '5%' }} />
+          </>
+        )}
         
         <div className="relative z-10 px-4 sm:px-6 lg:px-10 xl:px-16 2xl:px-24 py-6 sm:py-8">
           {children}
@@ -180,7 +196,7 @@ function Layout({ children }: LayoutProps) {
         }}
       >
         <div className="flex justify-around items-center h-16 px-2 pb-safe">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon
             const isActive = isActivePath(item.path)
             
