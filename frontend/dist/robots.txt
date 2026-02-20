@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Internal portal — not for indexing
+Disallow: /mx

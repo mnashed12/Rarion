@@ -12,7 +12,6 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  Sparkles,
 } from 'lucide-react'
 import apiClient from '../services/api'
 import type { InventoryItem, Deck } from '../types'
