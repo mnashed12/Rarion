@@ -88,12 +88,12 @@ function Layout({ children }: LayoutProps) {
               <img 
                 src="/images/RarionLogoPlainnobg.png" 
                 alt="Rarion" 
-                className={`w-auto object-contain transition-transform group-hover:scale-105 ${location.pathname === '/' ? 'mt-8 h-18 sm:h-24' : 'h-18 sm:h-18'}`}
+                className={`w-auto object-contain transition-transform group-hover:scale-105 ${(location.pathname === '/' || location.pathname === '/decks') ? 'mt-8 h-18 sm:h-24' : 'h-18 sm:h-18'}`}
               />
               <img 
                 src="/images/rariontext.png" 
                 alt="Rarion" 
-                className={`w-auto object-contain pb-1 ${location.pathname === '/' ? 'mb-4 h-4 sm:h-10' : 'h-4 sm:h-6'}`}
+                className={`w-auto object-contain pb-1 ${(location.pathname === '/' || location.pathname === '/decks') ? 'mb-4 h-4 sm:h-10' : 'h-4 sm:h-6'}`}
               />
             </Link>
 
@@ -110,7 +110,7 @@ function Layout({ children }: LayoutProps) {
                     className={`
                       flex items-center gap-2 px-4 py-2.5 rounded-xl
                       font-semibold transition-all duration-200
-                      ${location.pathname === '/' ? 'mt-10 text-lg' : 'text-sm'}
+                      ${(location.pathname === '/' || location.pathname === '/decks') ? 'mt-10 text-lg' : 'text-sm'}
                       ${isActive 
                         ? 'bg-white/20 text-white shadow-lg shadow-purple-500/20' 
                         : 'text-purple-100 hover:text-white hover:bg-white/10'

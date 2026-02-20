@@ -426,6 +426,39 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
             'item': serializer.data
         })
 
+    @action(detail=False, methods=['get'])
+    def prestige_by_deck(self, request):
+        """
+        Return prestige counts per deck.
+
+        Response shape:
+          {
+            <deck_id>: { "star": N, "galaxy": N, "cosmos": N, "rarion": N, "total": N },
+            ...
+          }
+        """
+        from django.db.models import Q
+
+        rows = (
+            InventoryItem.objects
+            .filter(deck__isnull=False)
+            .values('deck_id', 'prestige')
+            .annotate(count=Count('id'))
+        )
+
+        result: dict = {}
+        for row in rows:
+            deck_id = row['deck_id']
+            prestige = row['prestige']
+            count = row['count']
+            if deck_id not in result:
+                result[deck_id] = {'star': 0, 'galaxy': 0, 'cosmos': 0, 'rarion': 0, 'total': 0}
+            if prestige in result[deck_id]:
+                result[deck_id][prestige] = count
+            result[deck_id]['total'] += count
+
+        return Response(result)
+
 
 class StreamEventViewSet(viewsets.ModelViewSet):
     """
