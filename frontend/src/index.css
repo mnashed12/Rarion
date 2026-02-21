@@ -131,12 +131,19 @@ body {
 }
 
 @keyframes scroll-left {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+@keyframes scroll-right {
+  from { transform: translateX(-50%); }
+  to   { transform: translateX(0); }
+}
+
+@keyframes shimmer-sweep {
+  0%   { transform: translateX(-100%); opacity: 0.8; }
+  60%  { transform: translateX(100%);  opacity: 0.4; }
+  100% { transform: translateX(200%);  opacity: 0; }
 }
 
 /* ============================================
