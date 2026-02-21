@@ -15,9 +15,6 @@ import {
   CreditCard, 
   Package, 
   Video, 
-  Menu,
-  X,
-  Sparkles,
   Layers,
 } from 'lucide-react'
 
@@ -39,7 +36,6 @@ const navItems = [
 function Layout({ children }: LayoutProps) {
   const location = useLocation()
   const { isInventoryAuthenticated } = useAuth()
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
 
   // Handle scroll for header shadow
@@ -50,11 +46,6 @@ function Layout({ children }: LayoutProps) {
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
-
-  // Close mobile menu on route change
-  useEffect(() => {
-    setMobileMenuOpen(false)
-  }, [location.pathname])
 
   const isActivePath = (path: string) => {
     if (path === '/') return location.pathname === '/'
@@ -93,7 +84,7 @@ function Layout({ children }: LayoutProps) {
               <img 
                 src="/images/rariontext.png" 
                 alt="Rarion" 
-                className={`w-auto object-contain pb-1 ${(location.pathname === '/' || location.pathname === '/decks') ? 'mb-4 h-4 sm:h-10' : 'h-10'}`}
+                className={`w-auto object-contain pb-1 ${(location.pathname === '/' || location.pathname === '/decks') ? 'mb-4 h-8 sm:h-10' : 'h-8 sm:h-10'}`}
               />
             </Link>
 
@@ -124,52 +115,7 @@ function Layout({ children }: LayoutProps) {
               })}
             </nav>
 
-            {/* Mobile Menu Button */}
-            <button
-              className="md:hidden p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-colors"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-label="Toggle menu"
-            >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
           </div>
-        </div>
-
-        {/* Mobile Dropdown Menu */}
-        <div 
-          className={`
-            md:hidden overflow-hidden transition-all duration-300 ease-in-out
-            ${mobileMenuOpen ? 'max-h-80 opacity-100' : 'max-h-0 opacity-0'}
-          `}
-          style={{
-            background: 'linear-gradient(180deg, #7c3aed 0%, #1e40af 100%)'
-          }}
-        >
-          <nav className="px-4 pb-4 pt-2 space-y-1">
-            {visibleNavItems.map((item) => {
-              const Icon = item.icon
-              const isActive = isActivePath(item.path)
-              
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`
-                    flex items-center gap-3 px-4 py-3.5 rounded-xl
-                    transition-all duration-200
-                    ${isActive 
-                      ? 'bg-white/20 text-white font-semibold' 
-                      : 'text-purple-100 hover:bg-white/10 hover:text-white'
-                    }
-                  `}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span>{item.label}</span>
-                  {isActive && <Sparkles className="w-4 h-4 ml-auto text-pink-400" />}
-                </Link>
-              )
-            })}
-          </nav>
         </div>
       </header>
 
