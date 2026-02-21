@@ -92,13 +92,14 @@ const ITEMS_PER_PAGE = 24
 export default function DecksPage() {
   const [decks, setDecks]               = useState<Deck[]>([])
   const [selectedDeck, setSelectedDeck] = useState<Deck | null>(null)
+  const [statsMap, setStatsMap]         = useState<StatsMap>({})
   const [inventory, setInventory]       = useState<InventoryItem[]>([])
   const [totalCount, setTotalCount]     = useState(0)
   const [loading, setLoading]           = useState(false)
   const [searchTerm, setSearchTerm]     = useState('')
   const [page, setPage]                 = useState(1)
 
-  // ── fetch decks + prestige stats ──────────────────────────────────────
+  // ── fetch decks + prestige stats (initial load) ───────────────────────
   useEffect(() => {
     const fetchDecks = async () => {
       try {
@@ -110,12 +111,28 @@ export default function DecksPage() {
         const statsData: StatsMap = statsRes.status === 'fulfilled' ? statsRes.value.data : {}
         const fetched = mergePrestigeStats(deckRes.value.data.results || deckRes.value.data, statsData)
         setDecks(fetched)
+        setStatsMap(statsData)
         if (fetched.length > 0) setSelectedDeck(fetched[0])
       } catch (err) {
         console.error('Error fetching decks:', err)
       }
     }
     fetchDecks()
+  }, [])
+
+  // ── poll prestige stats every 5s so bars update live after QR scans ───
+  // Only updates statsMap — never touches selectedDeck so inventory doesn't refetch
+  useEffect(() => {
+    const pollStats = async () => {
+      try {
+        const res = await apiClient.get('/inventory/prestige_by_deck/')
+        setStatsMap(res.data)
+      } catch {
+        // silent — don't disrupt UI if poll fails
+      }
+    }
+    const interval = setInterval(pollStats, 5000)
+    return () => clearInterval(interval)
   }, [])
 
   // ── fetch inventory when deck / search / page change ──────────────────
@@ -139,23 +156,10 @@ export default function DecksPage() {
       }
     }
     fetchInventory()
-  }, [selectedDeck, searchTerm, page])
+  }, [selectedDeck?.id, searchTerm, page])
 
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE)
 
-  // ── condition display ─────────────────────────────────────────────────
-  const conditionLabel: Record<string, string> = {
-    mint: 'M', near_mint: 'NM', lightly_played: 'LP',
-    moderately_played: 'MP', heavily_played: 'HP', damaged: 'D',
-  }
-  const conditionColor: Record<string, string> = {
-    mint:               'bg-teal-500 text-white',
-    near_mint:          'bg-emerald-500 text-white',
-    lightly_played:     'bg-blue-500 text-white',
-    moderately_played:  'bg-amber-400 text-black',
-    heavily_played:     'bg-orange-500 text-white',
-    damaged:            'bg-red-600 text-white',
-  }
 
   // ── render ────────────────────────────────────────────────────────────
   return (
@@ -215,7 +219,7 @@ export default function DecksPage() {
               <div className="flex gap-4 sm:gap-5 justify-center overflow-visible" style={{ minWidth: 'max-content', scrollSnapType: 'x mandatory' }}>
               {decks.map(deck => {
                 const isActive = selectedDeck?.id === deck.id
-                const stats    = deck.prestige_stats
+                const stats    = statsMap[deck.id] ?? deck.prestige_stats
                 const total    = stats?.total ?? 0
 
                 return (
@@ -361,82 +365,37 @@ export default function DecksPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4">
-              {inventory.map(item => {
-                const tier = TIERS.find(t => t.key === item.prestige) ?? TIERS[0]
-                return (
+              {inventory.map(item => (
                   <div
                     key={item.id}
-                    className="group relative aspect-[3/4] rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+                    className="aspect-[3/4] rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
                   >
-                    {/* Card image */}
                     {item.card_detail?.image ? (
                       <img
                         src={item.card_detail.image}
                         alt={item.card_detail.name}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        className="w-full h-full object-cover"
                         loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-200 flex flex-col items-center justify-center gap-2">
-                        <Package className="w-8 h-8 text-slate-300" />
-                        <span className="text-[10px] font-bold text-slate-400 text-center px-2 leading-tight">
-                          {item.card_detail?.name || 'Unknown'}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Bottom gradient + name */}
-                    <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
-                    <div className="absolute bottom-2 left-2 right-9">
-                      <p className="text-white text-[11px] font-bold truncate leading-tight drop-shadow">
-                        {item.card_detail?.name || 'Unknown'}
-                      </p>
-                      <p className="text-white/50 text-[9px] truncate mt-0.5">
-                        {item.card_detail?.set_name || ''}
-                      </p>
-                    </div>
-
-                    {/* Prestige badge — top right */}
-                    <div className="absolute top-2 right-2">
-                      <div
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-sm backdrop-blur-sm"
-                        style={{
-                          background: tier.condBg,
-                          border:     `1.5px solid ${tier.condBorder}`,
+                        onError={(e) => {
+                          const target = e.currentTarget
+                          target.onerror = null
+                          target.style.display = 'none'
+                          const fallback = target.nextElementSibling as HTMLElement | null
+                          if (fallback) fallback.style.display = 'flex'
                         }}
-                        title={`${tier.label} — ${tier.range}`}
-                      >
-                        {tier.sym}
-                      </div>
-                    </div>
-
-                    {/* Condition badge — top left */}
-                    <div className="absolute top-2 left-2">
-                      <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${conditionColor[item.condition] || 'bg-gray-500 text-white'}`}>
-                        {conditionLabel[item.condition] || item.condition}
+                      />
+                    ) : null}
+                    <div
+                      className="w-full h-full bg-gradient-to-br from-slate-700 to-slate-900 flex flex-col items-center justify-center gap-2"
+                      style={{ display: item.card_detail?.image ? 'none' : 'flex' }}
+                    >
+                      <Package className="w-8 h-8 text-slate-500" />
+                      <span className="text-[10px] font-bold text-slate-400 text-center px-2 leading-tight">
+                        {item.card_detail?.name || 'Unknown'}
                       </span>
                     </div>
-
-                    {/* Qty badge — bottom right */}
-                    {item.quantity > 1 && (
-                      <div className="absolute bottom-2 right-2">
-                        <span className="text-[10px] font-black text-white bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded-md">
-                          ×{item.quantity}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Tier-tinted hover glow border */}
-                    <div
-                      className="absolute inset-0 rounded-2xl border-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-                      style={{
-                        borderColor: tier.accent,
-                        boxShadow: `inset 0 0 20px ${tier.accent}20`,
-                      }}
-                    />
                   </div>
-                )
-              })}
+              ))}
             </div>
           )
         )}

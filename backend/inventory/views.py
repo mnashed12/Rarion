@@ -441,7 +441,7 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
 
         rows = (
             InventoryItem.objects
-            .filter(deck__isnull=False)
+            .filter(deck__isnull=False, sold_at__isnull=True)
             .values('deck_id', 'prestige')
             .annotate(count=Count('id'))
         )
