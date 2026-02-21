@@ -7,6 +7,8 @@ import DecksPage from './pages/DecksPage'
 import InventoryPage from './pages/InventoryPage'
 import StreamsPage from './pages/StreamsPage'
 import NotFoundPage from './pages/NotFoundPage'
+import TermsPage from './pages/TermsPage'
+import PrivacyPage from './pages/PrivacyPage'
 
 // Layout components
 import Layout from './components/common/Layout'
@@ -49,6 +51,8 @@ function App() {
                 <StreamsPage />
               </InventoryProtectedRoute>
             } />
+            <Route path="/tos" element={<TermsPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Layout>

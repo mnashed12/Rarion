@@ -93,7 +93,7 @@ function Layout({ children }: LayoutProps) {
               <img 
                 src="/images/rariontext.png" 
                 alt="Rarion" 
-                className={`w-auto object-contain pb-1 ${(location.pathname === '/' || location.pathname === '/decks') ? 'mb-4 h-4 sm:h-10' : 'h-4 sm:h-6'}`}
+                className={`w-auto object-contain pb-1 ${(location.pathname === '/' || location.pathname === '/decks') ? 'mb-4 h-4 sm:h-10' : 'h-10'}`}
               />
             </Link>
 

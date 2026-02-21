@@ -11,6 +11,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Package, Sparkles } from 'lucide-react'
 import apiClient from '../services/api'
 import { InventoryItem } from '../types'
@@ -162,9 +163,10 @@ interface StripProps {
   cards: InventoryItem[]
   direction: 'left' | 'right'
   rowHeight: string
+  align?: 'start' | 'center' | 'end'
 }
 
-function CardStrip({ cards, direction, rowHeight }: StripProps) {
+function CardStrip({ cards, direction, rowHeight, align = 'center' }: StripProps) {
   if (cards.length === 0) {
     return (
       <div
@@ -179,21 +181,23 @@ function CardStrip({ cards, direction, rowHeight }: StripProps) {
   const repsPerHalf = Math.max(2, Math.ceil(30 / cards.length))
   const half  = Array.from({ length: repsPerHalf }, () => cards).flat()
   const track = [...half, ...half]
-  const speed = rowHeight === '50%' ? half.length * 4 : half.length * 3
+  const speed = rowHeight === '38%' ? half.length * 9 : half.length * 7
   const anim  = direction === 'left'
     ? `scroll-left ${speed}s linear infinite`
     : `scroll-right ${speed}s linear infinite`
 
+  const alignClass = align === 'start' ? 'items-start' : align === 'end' ? 'items-end' : 'items-center'
+
   return (
     <div className="overflow-hidden flex-shrink-0 w-full" style={{ height: rowHeight }}>
-      <div className="flex gap-2 h-full" style={{ animation: anim, width: 'max-content' }}>
+      <div className={`flex gap-4 h-full ${alignClass}`} style={{ animation: anim, width: 'max-content' }}>
         {track.map((item, idx) => (
           <div
             key={`${item.id}-${idx}`}
-            className="flex-shrink-0 h-full group relative"
+            className="flex-shrink-0 h-[70%] relative"
             style={{ aspectRatio: '2.5 / 3.5' }}
           >
-            <div className="w-full h-full rounded-xl overflow-hidden shadow-2xl transition-transform duration-300 group-hover:scale-105 group-hover:z-10 relative">
+            <div className="w-full h-full rounded-xl overflow-hidden shadow-2xl">
               {item.card_detail?.image ? (
                 <img
                   src={item.card_detail.image}
@@ -206,11 +210,6 @@ function CardStrip({ cards, direction, rowHeight }: StripProps) {
                   <Package className="w-1/4 h-1/4 text-slate-500" />
                 </div>
               )}
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-2 rounded-b-xl opacity-0 group-hover:opacity-100 transition-opacity">
-                <p className="text-white text-[10px] font-black truncate leading-tight">
-                  {item.card_detail?.name || 'Unknown'}
-                </p>
-              </div>
             </div>
           </div>
         ))}
@@ -304,10 +303,30 @@ function HomePage() {
     <>
       <div className="fixed inset-0 z-40 overflow-hidden flex flex-col" style={bgStyle}>
         <div className="absolute inset-0 bg-black/50" />
-        <div className="relative z-10 flex flex-col h-full">
-          <CardStrip cards={rarionCards} direction="left"  rowHeight="50%" />
-          <CardStrip cards={cosmosCards} direction="right" rowHeight="25%" />
-          <CardStrip cards={otherCards}  direction="left"  rowHeight="25%" />
+        <div className="relative z-10 flex flex-col h-full pt-20 sm:pt-24">
+          <CardStrip cards={rarionCards} direction="left"  rowHeight="38%" align="end" />
+          <CardStrip cards={cosmosCards} direction="right" rowHeight="31%" align="end" />
+          <CardStrip cards={otherCards}  direction="left"  rowHeight="31%" align="start" />
+        </div>
+
+        {/* Footer — floats above cards in the empty bottom space */}
+        <div className="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-between px-5 py-2.5">
+          {/* Left: logo + copyright */}
+          <div className="flex items-center gap-2.5">
+            <img src="/images/RarionLogoPlainnobg.png" alt="Rarion" className="h-4 w-auto opacity-50" />
+            <span className="text-white/30 text-[10px] font-medium hidden sm:inline">© {new Date().getFullYear()} Rarion. All rights reserved.</span>
+          </div>
+
+          {/* Center: disclaimer */}
+          <span className="text-white/25 text-[9px] text-center hidden md:block">
+            Not affiliated with Nintendo or The Pokémon Company International.
+          </span>
+
+          {/* Right: legal links */}
+          <div className="flex items-center gap-4">
+            <Link to="/tos"     className="text-white/35 hover:text-white/70 text-[10px] font-medium transition-colors">Terms</Link>
+            <Link to="/privacy" className="text-white/35 hover:text-white/70 text-[10px] font-medium transition-colors">Privacy</Link>
+          </div>
         </div>
       </div>
 
