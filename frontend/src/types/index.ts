@@ -453,6 +453,7 @@ export interface DeckPrestigeStats {
 export interface Deck {
   id: number;
   name: string;
+  background_image: 'PAKMAKDECK' | 'DANNYDECK';
   owner: number;
   created_at: string;
   updated_at: string;

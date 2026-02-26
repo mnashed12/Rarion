@@ -278,7 +278,7 @@ REST_FRAMEWORK = {
     ],
     
     # Pagination settings
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'DEFAULT_PAGINATION_CLASS': 'inventory.pagination.FlexiblePageNumberPagination',
     'PAGE_SIZE': 20,
     
     # Filtering backend

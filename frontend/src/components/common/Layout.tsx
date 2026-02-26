@@ -12,7 +12,6 @@ import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { 
   Home, 
-  CreditCard, 
   Package, 
   Video, 
   Layers,
@@ -27,8 +26,8 @@ interface LayoutProps {
  */
 const navItems = [
   { path: '/', label: 'Home', icon: Home },
-  { path: '/cards', label: 'Cards', icon: CreditCard },
-  { path: '/decks', label: 'Decks', icon: Layers },
+  // { path: '/cards', label: 'Cards', icon: CreditCard },
+  { path: '/decks', label: 'Card List', icon: Layers },
   { path: '/inventory', label: 'Inventory', icon: Package },
   { path: '/streams', label: 'Streams', icon: Video },
 ]
@@ -61,15 +60,18 @@ function Layout({ children }: LayoutProps) {
   })
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div
+      className="min-h-screen flex flex-col"
+      style={location.pathname === '/inventory' ? { backgroundImage: `url(${'/images/deckbg.jpg'})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' } : undefined}
+    >
       {/* Header - transparent on homepage + decks, gradient elsewhere */}
       <header
-        className={`sticky top-0 z-50 transition-all duration-300 ${scrolled && location.pathname !== '/' && location.pathname !== '/decks' ? 'shadow-lg shadow-purple-900/30' : ''}`}
-        style={location.pathname !== '/' && location.pathname !== '/decks' ? {
+        className={`sticky top-0 z-50 transition-all duration-300 ${scrolled && location.pathname !== '/' && location.pathname !== '/decks' && location.pathname !== '/inventory' ? 'shadow-lg shadow-purple-900/30' : ''}`}
+        style={location.pathname !== '/' && location.pathname !== '/decks' && location.pathname !== '/inventory' ? {
           background: 'linear-gradient(135deg, #0c1844 0%, #1e40af 25%, #7c3aed 60%, #ec4899 100%)'
         } : undefined}
       >
-        {location.pathname !== '/' && location.pathname !== '/decks' && (
+        {location.pathname !== '/' && location.pathname !== '/decks' && location.pathname !== '/inventory' && (
           <div className="h-1 bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500" />
         )}
         <div className="px-4 sm:px-6 lg:px-10 xl:px-16 2xl:px-24">
@@ -79,12 +81,12 @@ function Layout({ children }: LayoutProps) {
               <img 
                 src="/images/RarionLogoPlainnobg.png" 
                 alt="Rarion" 
-                className={`w-auto object-contain transition-transform group-hover:scale-105 ${(location.pathname === '/' || location.pathname === '/decks') ? 'mt-8 h-18 sm:h-24' : 'h-18 sm:h-18'}`}
+                className={`w-auto object-contain transition-transform group-hover:scale-105 ${(location.pathname === '/' || location.pathname === '/decks' || location.pathname === '/inventory') ? 'mt-8 h-18 sm:h-24' : 'h-18 sm:h-18'}`}
               />
               <img 
                 src="/images/rariontext.png" 
                 alt="Rarion" 
-                className={`w-auto object-contain pb-1 ${(location.pathname === '/' || location.pathname === '/decks') ? 'mb-4 h-8 sm:h-10' : 'h-8 sm:h-10'}`}
+                className={`w-auto object-contain pb-1 ${(location.pathname === '/' || location.pathname === '/decks' || location.pathname === '/inventory') ? 'mb-4 h-8 sm:h-10' : 'h-8 sm:h-10'}`}
               />
             </Link>
 
@@ -101,7 +103,7 @@ function Layout({ children }: LayoutProps) {
                     className={`
                       flex items-center gap-2 px-4 py-2.5 rounded-xl
                       font-semibold transition-all duration-200
-                      ${(location.pathname === '/' || location.pathname === '/decks') ? 'mt-10 text-lg' : 'text-sm'}
+                      ${(location.pathname === '/' || location.pathname === '/decks' || location.pathname === '/inventory') ? 'mt-10 text-lg' : 'text-sm'}
                       ${isActive 
                         ? 'bg-white/20 text-white shadow-lg shadow-purple-500/20' 
                         : 'text-purple-100 hover:text-white hover:bg-white/10'
@@ -120,21 +122,29 @@ function Layout({ children }: LayoutProps) {
       </header>
 
       {/* Main Content */}
-      <main className={`flex-1 pb-20 md:pb-8 ${location.pathname === '/decks' ? '' : 'pokemon-content-bg'}`}>
-        {/* Decorative pokeballs (hidden on decks — full-page bg image takes over) */}
-        {location.pathname !== '/decks' && (
+      <main
+        className={`flex-1 ${location.pathname === '/decks' || location.pathname === '/inventory' ? '' : 'pb-20 md:pb-8 pokemon-content-bg'}`}
+      >
+        {/* Decorative pokeballs (hidden on decks/inventory — full-page bg takes over) */}
+        {location.pathname !== '/decks' && location.pathname !== '/inventory' && (
           <>
             <div className="pokeball-deco" style={{ top: '15%', left: '3%' }} />
             <div className="pokeball-deco" style={{ top: '60%', right: '5%' }} />
           </>
         )}
         
-        <div className="relative z-10 px-4 sm:px-6 lg:px-10 xl:px-16 2xl:px-24 py-6 sm:py-8">
-          {children}
-        </div>
+        {location.pathname === '/decks' || location.pathname === '/inventory' ? (
+          // Immersive full-bleed — no stacking context wrapper so modals can escape
+          children
+        ) : (
+          <div className="relative z-10 px-4 sm:px-6 lg:px-10 xl:px-16 2xl:px-24 py-6 sm:py-8">
+            {children}
+          </div>
+        )}
       </main>
 
-      {/* Mobile Bottom Navigation - Rarion themed */}
+      {/* Mobile Bottom Navigation — hidden on immersive pages (/decks) */}
+      {location.pathname !== '/decks' && (
       <nav 
         className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t-2 border-purple-900/30"
         style={{
@@ -177,8 +187,10 @@ function Layout({ children }: LayoutProps) {
           })}
         </div>
       </nav>
+      )}
 
-      {/* Footer - Pokemon striped dark style */}
+      {/* Footer — hidden on immersive pages (/decks) */}
+      {location.pathname !== '/decks' && (
       <footer className="hidden md:block pokemon-stripes-dark py-8 border-t-4 border-gray-700">
         <div className="px-4 sm:px-6 lg:px-10 xl:px-16 2xl:px-24">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -203,6 +215,7 @@ function Layout({ children }: LayoutProps) {
           </div>
         </div>
       </footer>
+      )}
     </div>
   )
 }

@@ -305,6 +305,23 @@ function HomePage() {
         <div className="absolute inset-0 bg-black/50" />
         <div className="relative z-10 flex flex-col h-full pt-20 sm:pt-24">
           <CardStrip cards={rarionCards} direction="left"  rowHeight="38%" align="end" />
+          {/* Recently Pulled heading */}
+          <div className="flex items-center justify-center gap-5">
+            <span className="block h-px w-20 sm:w-32 bg-gradient-to-r from-transparent to-white/30" />
+            <span
+              className="text-2xl sm:text-4xl font-black tracking-[0.2em] uppercase whitespace-nowrap"
+              style={{
+                background: 'linear-gradient(90deg, #fb923c 0%, #c084fc 50%, #60a5fa 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                filter: 'drop-shadow(0 0 18px rgba(192,132,252,0.65))',
+              }}
+            >
+              Recently Pulled
+            </span>
+            <span className="block h-px w-20 sm:w-32 bg-gradient-to-l from-transparent to-white/30" />
+          </div>
           <CardStrip cards={cosmosCards} direction="right" rowHeight="31%" align="end" />
           <CardStrip cards={otherCards}  direction="left"  rowHeight="31%" align="start" />
         </div>

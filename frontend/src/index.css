@@ -617,6 +617,11 @@ body {
     100% { background-position: -200% 0; }
   }
 
+  /* Hide the sticky navbar when the carousel overlay is open */
+  body.carousel-open header {
+    display: none !important;
+  }
+
   /* Page header */
   .page-header {
     @apply mb-6;

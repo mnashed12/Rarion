@@ -383,9 +383,20 @@ class Deck(models.Model):
     Represents a deck that can contain multiple inventory items.
     Used to organize cards into different collections/decks.
     """
+    BACKGROUND_CHOICES = [
+        ('PAKMAKDECK', 'Pakmak Deck'),
+        ('DANNYDECK',  'Danny Deck'),
+    ]
+
     name = models.CharField(
         max_length=100,
         help_text="Name of the deck"
+    )
+    background_image = models.CharField(
+        max_length=20,
+        choices=BACKGROUND_CHOICES,
+        default='PAKMAKDECK',
+        help_text="Background image for the deck card"
     )
     owner = models.ForeignKey(
         get_user_model(),

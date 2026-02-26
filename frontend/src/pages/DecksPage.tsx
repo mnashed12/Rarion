@@ -9,8 +9,6 @@ import { useState, useEffect } from 'react'
 import {
   Package,
   Search,
-  ChevronLeft,
-  ChevronRight,
   X,
 } from 'lucide-react'
 import apiClient from '../services/api'
@@ -77,6 +75,12 @@ const TIERS = [
   },
 ] as const
 
+// Map deck background_image key → filename (default: PAKMAKDECK.PNG)
+function getDeckImage(deck: Deck): string {
+  if (deck.background_image === 'DANNYDECK') return 'DANNYDECK.PNG'
+  return 'PAKMAKDECK.PNG'
+}
+
 // Deterministic starfield via golden-ratio spacing
 const STARS = Array.from({ length: 60 }, (_, i) => ({
   left:    `${((i * 161.803) % 100).toFixed(1)}%`,
@@ -87,17 +91,15 @@ const STARS = Array.from({ length: 60 }, (_, i) => ({
 
 // ─── component ───────────────────────────────────────────────────────────────
 
-const ITEMS_PER_PAGE = 24
+const TIER_ORDER = ['rarion', 'cosmos', 'galaxy', 'star'] as const
 
 export default function DecksPage() {
   const [decks, setDecks]               = useState<Deck[]>([])
   const [selectedDeck, setSelectedDeck] = useState<Deck | null>(null)
   const [statsMap, setStatsMap]         = useState<StatsMap>({})
   const [inventory, setInventory]       = useState<InventoryItem[]>([])
-  const [totalCount, setTotalCount]     = useState(0)
   const [loading, setLoading]           = useState(false)
   const [searchTerm, setSearchTerm]     = useState('')
-  const [page, setPage]                 = useState(1)
 
   // ── fetch decks + prestige stats (initial load) ───────────────────────
   useEffect(() => {
@@ -135,20 +137,26 @@ export default function DecksPage() {
     return () => clearInterval(interval)
   }, [])
 
-  // ── fetch inventory when deck / search / page change ──────────────────
+  // ── fetch all inventory for selected deck ───────────────────────────
   useEffect(() => {
     if (!selectedDeck) return
     const fetchInventory = async () => {
       setLoading(true)
       try {
-        const params = new URLSearchParams()
-        params.append('deck',      selectedDeck.id.toString())
-        params.append('page',      page.toString())
-        params.append('page_size', ITEMS_PER_PAGE.toString())
-        if (searchTerm) params.append('search', searchTerm)
-        const res = await apiClient.get(`/inventory/?${params}`)
-        setInventory(res.data.results || [])
-        setTotalCount(res.data.count   || 0)
+        // Page through all results — works regardless of server page_size cap
+        const allItems: InventoryItem[] = []
+        let url = `/inventory/?deck=${selectedDeck.id}&page_size=100${searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : ''}`
+        while (url) {
+          const res = await apiClient.get(url)
+          allItems.push(...(res.data.results || []))
+          const next: string | null = res.data.next
+          if (!next) break
+          // DRF returns a full URL — strip everything up to and including /api
+          // so axios doesn't double-prepend the baseURL
+          const apiIndex = next.indexOf('/api/')
+          url = apiIndex !== -1 ? next.slice(apiIndex + 4) : next.replace(/^https?:\/\/[^/]+/, '')
+        }
+        setInventory(allItems)
       } catch (err) {
         console.error('Error fetching inventory:', err)
       } finally {
@@ -156,15 +164,93 @@ export default function DecksPage() {
       }
     }
     fetchInventory()
-  }, [selectedDeck?.id, searchTerm, page])
+  }, [selectedDeck?.id, searchTerm])
 
-  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE)
+  // ── poll sold_at every 5s so cards cross out live when QR is scanned ─
+  useEffect(() => {
+    if (!selectedDeck) return
+    const pollSoldAt = async () => {
+      try {
+        const allItems: InventoryItem[] = []
+        let url = `/inventory/?deck=${selectedDeck.id}&page_size=100${searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : ''}`
+        while (url) {
+          const res = await apiClient.get(url)
+          allItems.push(...(res.data.results || []))
+          const next: string | null = res.data.next
+          if (!next) break
+          const apiIndex = next.indexOf('/api/')
+          url = apiIndex !== -1 ? next.slice(apiIndex + 4) : next.replace(/^https?:\/\/[^/]+/, '')
+        }
+        // Merge only sold_at changes — avoids layout flash from full replace
+        setInventory(prev => prev.map(item => {
+          const updated = allItems.find(a => a.id === item.id)
+          if (!updated || updated.sold_at === item.sold_at) return item
+          return { ...item, sold_at: updated.sold_at }
+        }))
+      } catch {
+        // silent — poll failures shouldn't disrupt the UI
+      }
+    }
+    const interval = setInterval(pollSoldAt, 5000)
+    return () => clearInterval(interval)
+  }, [selectedDeck?.id, searchTerm])
+
+
+  // ── shared card renderer (used by all tier rows) ──────────────────────
+  const renderInventoryCard = (item: InventoryItem, idx: number, large = false) => {
+    const isSold = !!item.sold_at
+    return (
+      <div
+        key={`${item.id}-${idx}`}
+        className={`relative flex-shrink-0 aspect-[3/4] rounded-2xl overflow-hidden shadow-lg ${large ? 'w-52 sm:w-60' : 'w-36'}`}
+      >
+        {/* Card content — dimmed when sold */}
+        <div className={`w-full h-full transition-all duration-300 ${isSold ? 'opacity-40 grayscale' : ''}`}>
+          {item.card_detail?.image ? (
+            <img
+              src={item.card_detail.image}
+              alt={item.card_detail.name}
+              className="w-full h-full object-cover"
+              loading="lazy"
+              onError={(e) => {
+                const target = e.currentTarget
+                target.onerror = null
+                target.style.display = 'none'
+                const fallback = target.nextElementSibling as HTMLElement | null
+                if (fallback) fallback.style.display = 'flex'
+              }}
+            />
+          ) : null}
+          <div
+            className="w-full h-full bg-gradient-to-br from-slate-700 to-slate-900 flex flex-col items-center justify-center gap-2"
+            style={{ display: item.card_detail?.image ? 'none' : 'flex' }}
+          >
+            <Package className="w-6 h-6 text-slate-500" />
+            <span className="text-[9px] font-bold text-slate-400 text-center px-2 leading-tight">
+              {item.card_detail?.name || 'Unknown'}
+            </span>
+          </div>
+        </div>
+
+        {/* PULLED stamp — shown when sold */}
+        {isSold && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span
+              className="text-red-500 font-black text-lg tracking-widest rotate-[-20deg] border-4 border-red-500 px-2 py-0.5 rounded opacity-90"
+              style={{ textShadow: '0 1px 4px rgba(0,0,0,0.7)' }}
+            >
+              PULLED
+            </span>
+          </div>
+        )}
+      </div>
+    )
+  }
 
 
   // ── render ────────────────────────────────────────────────────────────
   return (
-    // Bleed edge-to-edge and up behind the transparent sticky header
-    <div className="-mt-[5.5rem] sm:-mt-24 -mx-4 sm:-mx-6 lg:-mx-10 xl:-mx-16 2xl:-mx-24">
+    <div>
 
       {/* Fixed full-page background — stays still while content scrolls */}
       <div
@@ -225,89 +311,67 @@ export default function DecksPage() {
                 return (
                   <div
                     key={deck.id}
-                    className="relative cursor-pointer flex-shrink-0 w-36 sm:w-44"
+                    className="relative cursor-pointer flex-shrink-0 w-60 sm:w-72"
                     style={{ scrollSnapAlign: 'start' }}
-                    onClick={() => { setSelectedDeck(deck); setPage(1) }}
+                    onClick={() => setSelectedDeck(deck)}
                   >
                     {/* Depth shadow layers */}
                     <div className="absolute inset-0 rounded-[20px] translate-y-2.5 translate-x-1 bg-black/25" />
                     <div className="absolute inset-0 rounded-[20px] translate-y-1 bg-black/15" />
 
-                    {/* Card face with holographic sweep on hover */}
+                    {/* Card face */}
                     <div
-                      className={`card-holo relative aspect-[2.5/3.5] rounded-[20px] overflow-hidden flex flex-col p-4 transition-all duration-300 ${
+                      className={`card-holo relative aspect-[2.5/3.5] rounded-[20px] overflow-hidden flex flex-col transition-all duration-300 ${
                         isActive ? 'scale-[1.07] -rotate-1' : 'hover:scale-[1.04] hover:-translate-y-1'
                       }`}
                       style={{
-                        background: isActive
-                          ? 'linear-gradient(145deg, #1e1b4b 0%, #4c1d95 45%, #7c1d4d 100%)'
-                          : 'linear-gradient(145deg, #1e293b 0%, #0f172a 100%)',
+                        backgroundImage: `url(${import.meta.env.BASE_URL}images/${getDeckImage(deck)})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
                         boxShadow: isActive
-                          ? '0 0 0 2.5px #a855f7, 0 0 50px rgba(168,85,247,0.45), 0 20px 40px rgba(0,0,0,0.55)'
-                          : '0 12px 32px rgba(0,0,0,0.45)',
+                          ? '0 0 0 2.5px #a855f7, 0 0 40px rgba(168,85,247,0.5), 0 20px 40px rgba(0,0,0,0.6)'
+                          : '0 12px 32px rgba(0,0,0,0.5)',
                       }}
                     >
-                      {/* Subtle diagonal texture */}
-                      <div
-                        className="absolute inset-0 pointer-events-none"
-                        style={{
-                          backgroundImage:
-                            'repeating-linear-gradient(-45deg, rgba(255,255,255,0.025) 0, rgba(255,255,255,0.025) 1px, transparent 1px, transparent 9px)',
-                        }}
+                      {/* Top scrim for name readability */}
+                      <div className="absolute inset-0 pointer-events-none"
+                        style={{ background: 'linear-gradient(to bottom, rgba(3,7,18,0.75) 0%, transparent 35%, transparent 50%, rgba(3,7,18,0.96) 100%)' }}
                       />
 
-                      {/* Glow orb */}
-                      <div
-                        className={`absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28 rounded-full blur-2xl pointer-events-none transition-opacity duration-300 ${isActive ? 'opacity-35' : 'opacity-10'}`}
-                        style={{
-                          background: isActive
-                            ? 'radial-gradient(circle, #a855f7, #ec4899)'
-                            : 'radial-gradient(circle, #6366f1, #3b82f6)',
-                        }}
-                      />
+                      {/* Active inner ring */}
+                      {isActive && (
+                        <div className="absolute inset-0 rounded-[20px] pointer-events-none"
+                          style={{ boxShadow: 'inset 0 0 0 2px rgba(168,85,247,0.7)' }} />
+                      )}
 
-                      {/* Deck name section */}
-                      <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center gap-1.5">
-                        <h3 className="font-black text-sm text-white leading-tight">{deck.name}</h3>
-                        {total > 0 && (
-                          <p className="text-[10px] font-semibold" style={{ color: isActive ? '#d8b4fe' : 'rgba(255,255,255,0.3)' }}>
-                            {total} card{total !== 1 ? 's' : ''}
-                          </p>
-                        )}
+                      {/* Deck name — top */}
+                      <div className="absolute top-0 inset-x-0 z-10 px-4 pt-4">
+                        <p className="font-black text-2xl text-white leading-tight tracking-tight">
+                          {deck.name}
+                        </p>
                       </div>
 
-                      {/* Prestige bars */}
-                      <div className="relative z-10 mt-2 w-full space-y-1.5">
+                      {/* Prestige bars — bottom */}
+                      <div className="absolute bottom-0 inset-x-0 z-10 px-4 pb-5 space-y-2.5">
                         {TIERS.map(t => {
-                          const count = stats?.[t.key] ?? 0
-                          const pct   = total > 0 ? Math.round((count / total) * 100) : 0
+                          const pct = total > 0 ? Math.round((stats?.[t.key] ?? 0) / total * 100) : 0
                           return (
-                            <div key={t.key} className="flex items-center gap-1.5">
-                              <div className="flex-1 h-1.5 rounded-full overflow-hidden bg-white/10">
+                            <div key={t.key} className="flex items-center gap-3">
+                              <span className="text-[13px] font-black w-14 flex-shrink-0 leading-none" style={{ color: t.accent }}>
+                                {t.label}
+                              </span>
+                              <div className="flex-1 h-3.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.15)' }}>
                                 <div
-                                  className={`h-full rounded-full transition-all duration-700 ${isActive ? t.activeBar : t.inactiveBar}`}
+                                  className={`h-full rounded-full transition-all duration-700 ${t.activeBar}`}
                                   style={{ width: `${pct}%` }}
                                 />
                               </div>
-                              <span
-                                className="text-[9px] font-bold w-6 text-right tabular-nums leading-none flex-shrink-0"
-                                style={{ color: isActive ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.28)' }}
-                              >
+                              <span className="text-[13px] font-black w-9 text-right tabular-nums leading-none flex-shrink-0 text-white">
                                 {pct}%
                               </span>
                             </div>
                           )
                         })}
-                      </div>
-
-                      {/* State indicator */}
-                      <div className="relative z-10 mt-2 text-center">
-                        <span
-                          className="text-[10px] font-black tracking-widest uppercase"
-                          style={{ color: isActive ? '#f9a8d4' : 'rgba(255,255,255,0.18)' }}
-                        >
-                          {isActive ? '● VIEWING' : 'SELECT'}
-                        </span>
                       </div>
                     </div>
                   </div>
@@ -335,7 +399,7 @@ export default function DecksPage() {
               onFocus={e  => (e.currentTarget.style.boxShadow = '0 0 0 2px rgba(168,85,247,0.55)')}
               onBlur={e   => (e.currentTarget.style.boxShadow = 'none')}
               value={searchTerm}
-              onChange={e => { setSearchTerm(e.target.value); setPage(1) }}
+              onChange={e => setSearchTerm(e.target.value)}
             />
             {searchTerm && (
               <button
@@ -349,14 +413,41 @@ export default function DecksPage() {
           </div>
         )}
 
-        {/* ── CARD PHOTO GRID ───────────────────────────────────────── */}
+        {/* ── PRESTIGE TIER ROWS ────────────────────────────────────── */}
         {selectedDeck && (
           loading ? (
-            // Skeleton grid
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4">
-              {[...Array(12)].map((_, i) => (
-                <div key={i} className="aspect-[3/4] rounded-2xl skeleton" />
-              ))}
+            <div className="space-y-8">
+              {TIER_ORDER.map(tierKey => {
+                const tier = TIERS.find(t => t.key === tierKey)!
+                return (
+                  <div key={tierKey}>
+                    {/* Tier label row — coloured accent hint */}
+                    <div className="flex items-center gap-2 mb-3 px-1">
+                      <div
+                        className="h-5 w-20 rounded-full animate-pulse"
+                        style={{ background: tier.condBg, border: `1px solid ${tier.condBorder}` }}
+                      />
+                      <div className="flex-1 h-px" style={{ background: tier.condBorder }} />
+                    </div>
+
+                    {/* Card placeholders — overflow-hidden mirrors the real scrolling row */}
+                    <div className="overflow-hidden">
+                      <div className="flex gap-3">
+                        {[...Array(8)].map((_, i) => (
+                          <div
+                            key={i}
+                            className="flex-shrink-0 w-36 aspect-[3/4] rounded-2xl animate-pulse"
+                            style={{
+                              background: 'rgba(255,255,255,0.07)',
+                              animationDelay: `${i * 120}ms`,
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           ) : inventory.length === 0 ? (
             <div className="rounded-3xl border-2 border-dashed border-white/20 p-16 text-center">
@@ -364,74 +455,91 @@ export default function DecksPage() {
               <p className="font-bold text-white/40">No cards found</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4">
-              {inventory.map(item => (
-                  <div
-                    key={item.id}
-                    className="aspect-[3/4] rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
-                  >
-                    {item.card_detail?.image ? (
-                      <img
-                        src={item.card_detail.image}
-                        alt={item.card_detail.name}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                        onError={(e) => {
-                          const target = e.currentTarget
-                          target.onerror = null
-                          target.style.display = 'none'
-                          const fallback = target.nextElementSibling as HTMLElement | null
-                          if (fallback) fallback.style.display = 'flex'
-                        }}
-                      />
-                    ) : null}
-                    <div
-                      className="w-full h-full bg-gradient-to-br from-slate-700 to-slate-900 flex flex-col items-center justify-center gap-2"
-                      style={{ display: item.card_detail?.image ? 'none' : 'flex' }}
-                    >
-                      <Package className="w-8 h-8 text-slate-500" />
-                      <span className="text-[10px] font-bold text-slate-400 text-center px-2 leading-tight">
-                        {item.card_detail?.name || 'Unknown'}
+            <div className="space-y-8">
+              {TIER_ORDER.map(tierKey => {
+                const tier = TIERS.find(t => t.key === tierKey)!
+                const cards = inventory.filter(item => item.prestige === tierKey)
+                if (cards.length === 0) return null
+                const shouldScroll = cards.length >= 8
+                const displayCards = shouldScroll ? [...cards, ...cards] : cards
+                const speed = Math.max(10, cards.length * 4)
+
+                return (
+                  <div key={tierKey}>
+                    {/* Row label */}
+                    <div className="flex items-center gap-2 mb-3 px-1">
+                      <span className="text-xl font-black tracking-wide" style={{ color: tier.accent }}>
+                        {tier.label}
                       </span>
+                      <span className="text-sm font-bold" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                        {cards.length} card{cards.length !== 1 ? 's' : ''}
+                      </span>
+                      <div className="flex-1 h-px" style={{ background: tier.condBorder }} />
                     </div>
+
+                    {shouldScroll ? (
+                      /* Scrolling row */
+                      <div className="overflow-hidden">
+                        <div
+                          className="flex gap-3"
+                          style={{
+                            animation: `scroll-left ${speed}s linear infinite`,
+                            width: `${displayCards.length * 148}px`,
+                          }}
+                        >
+                          {displayCards.map((item, idx) => renderInventoryCard(item, idx))}
+                        </div>
+                      </div>
+                    ) : (
+                      /* Static row — larger cards, centred */
+                      <div className="flex flex-wrap justify-center gap-4">
+                        {cards.map((item, idx) => renderInventoryCard(item, idx, true))}
+                      </div>
+                    )}
                   </div>
-              ))}
+                )
+              })}
+
+              {/* Unassigned — cards with no prestige tier */}
+              {(() => {
+                const knownTiers = new Set(TIER_ORDER as readonly string[])
+                const cards = inventory.filter(item => !knownTiers.has(item.prestige))
+                if (cards.length === 0) return null
+                const shouldScroll = cards.length >= 8
+                const displayCards = shouldScroll ? [...cards, ...cards] : cards
+                const speed = Math.max(10, cards.length * 4)
+
+                return (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3 px-1">
+                      <span className="text-xl font-black tracking-wide text-white/50">Unassigned</span>
+                      <span className="text-sm font-bold text-white/30">
+                        {cards.length} card{cards.length !== 1 ? 's' : ''}
+                      </span>
+                      <div className="flex-1 h-px bg-white/10" />
+                    </div>
+                    {shouldScroll ? (
+                      <div className="overflow-hidden">
+                        <div
+                          className="flex gap-3"
+                          style={{
+                            animation: `scroll-left ${speed}s linear infinite`,
+                            width: `${displayCards.length * 148}px`,
+                          }}
+                        >
+                          {displayCards.map((item, idx) => renderInventoryCard(item, idx))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap justify-center gap-4">
+                        {cards.map((item, idx) => renderInventoryCard(item, idx, true))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
           )
-        )}
-
-        {/* ── PAGINATION ────────────────────────────────────────────── */}
-        {selectedDeck && totalPages > 1 && (
-          <div className="flex justify-between items-center pt-2">
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="flex items-center gap-2 px-5 py-3 text-white text-sm font-bold rounded-2xl disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-              style={{ background: 'rgba(255,255,255,0.12)', border: '1.5px solid rgba(255,255,255,0.18)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
-            >
-              <ChevronLeft className="w-4 h-4" />
-              Previous
-            </button>
-
-            <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.5)' }}>
-              <span className="font-black text-white">{page}</span>
-              {' '}of{' '}
-              <span className="font-bold" style={{ color: 'rgba(255,255,255,0.6)' }}>{totalPages}</span>
-            </span>
-
-            <button
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className="flex items-center gap-2 px-5 py-3 text-white text-sm font-bold rounded-2xl shadow-lg disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
-              style={{
-                background:  'linear-gradient(135deg, #7c3aed, #be185d)',
-                boxShadow:   '0 4px 20px rgba(124,58,237,0.40)',
-              }}
-            >
-              Next
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
         )}
 
       </div>

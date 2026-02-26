@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Inventory Page
  * 
  * Pokemon-themed inventory management with:
@@ -15,8 +15,6 @@ import {
   Search, 
   SlidersHorizontal,
   Download, 
-  TrendingUp,
-  AlertTriangle,
   Edit2,
   Trash2,
   ChevronLeft,
@@ -39,6 +37,125 @@ import apiClient, { API_BASE_URL } from '../services/api'
 import type { InventoryItem, Deck } from '../types'
 import { Toast, ConfirmModal, type ToastType } from '../components/common'
 
+// ── prestige config (mirrors HomePage) ───────────────────────────────────────
+const PRESTIGE_CONFIG: Record<string, { label: string; sym: string; glow: string; border: string; badge: string }> = {
+  rarion: {
+    label:  'Rarion',
+    sym:    '🔥',
+    glow:   'rgba(251,146,60,0.7)',
+    border: '#fb923c',
+    badge:  'linear-gradient(135deg, #f97316, #dc2626)',
+  },
+  cosmos: {
+    label:  'Cosmos',
+    sym:    '◆',
+    glow:   'rgba(192,132,252,0.7)',
+    border: '#c084fc',
+    badge:  'linear-gradient(135deg, #a855f7, #7c3aed)',
+  },
+  galaxy: {
+    label:  'Galaxy',
+    sym:    '✦',
+    glow:   'rgba(96,165,250,0.6)',
+    border: '#60a5fa',
+    badge:  'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+  },
+  star: {
+    label:  'Star',
+    sym:    '★',
+    glow:   'rgba(226,232,240,0.5)',
+    border: '#e2e8f0',
+    badge:  'linear-gradient(135deg, #94a3b8, #475569)',
+  },
+}
+
+// ── pull notification ─────────────────────────────────────────────────────────
+function PullNotification({ item, onDone }: { item: InventoryItem; onDone: () => void }) {
+  const [phase, setPhase] = useState<'in' | 'show' | 'out'>('in')
+  const cfg = PRESTIGE_CONFIG[item.prestige] ?? PRESTIGE_CONFIG.star
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setPhase('show'), 50)
+    const t2 = setTimeout(() => setPhase('out'),  4500)
+    const t3 = setTimeout(() => onDone(),          5200)
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
+  }, [])
+
+  const translateY = phase === 'in' ? '100%' : phase === 'out' ? '120%' : '0%'
+  const opacity    = phase === 'show' ? 1 : 0
+
+  return (
+    <div
+      className="fixed bottom-8 left-1/2 z-[9999] pointer-events-none"
+      style={{
+        transform:  `translateX(-50%) translateY(${translateY})`,
+        opacity,
+        transition: 'transform 0.55s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s ease',
+        width:      'min(480px, 92vw)',
+      }}
+    >
+      <div
+        className="relative rounded-2xl overflow-hidden flex items-center gap-4 p-4"
+        style={{
+          background:     'linear-gradient(135deg, rgba(15,10,40,0.97) 0%, rgba(30,20,60,0.97) 100%)',
+          border:         `2px solid ${cfg.border}`,
+          boxShadow:      `0 0 40px ${cfg.glow}, 0 20px 60px rgba(0,0,0,0.7)`,
+          backdropFilter: 'blur(20px)',
+        }}
+      >
+        {/* Shimmer sweep */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: `linear-gradient(105deg, transparent 30%, ${cfg.glow} 50%, transparent 70%)`,
+            animation:  'shimmer-sweep 1.8s ease-out forwards',
+          }}
+        />
+        {/* Card thumbnail */}
+        <div
+          className="relative flex-shrink-0 rounded-xl overflow-hidden"
+          style={{ width: '70px', aspectRatio: '2.5/3.5', boxShadow: `0 0 20px ${cfg.glow}`, border: `2px solid ${cfg.border}` }}
+        >
+          {item.card_detail?.image ? (
+            <img src={item.card_detail.image} alt={item.card_detail.name} className="w-full h-full object-contain" />
+          ) : (
+            <div className="w-full h-full bg-slate-800 flex items-center justify-center">
+              <Package className="w-6 h-6 text-slate-500" />
+            </div>
+          )}
+        </div>
+        {/* Text */}
+        <div className="flex-1 min-w-0 relative z-10">
+          <div className="flex items-center gap-2 mb-1">
+            <Sparkles className="w-3.5 h-3.5 flex-shrink-0" style={{ color: cfg.border }} />
+            <span className="text-[11px] font-black tracking-widest uppercase" style={{ color: cfg.border }}>just pulled</span>
+          </div>
+          <p className="text-white font-black text-lg leading-tight truncate">
+            {item.card_detail?.name || 'Unknown Card'}
+          </p>
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            {item.card_detail?.set_name && (
+              <span className="text-white/40 text-[11px] font-semibold truncate max-w-[180px]">{item.card_detail.set_name}</span>
+            )}
+            <span
+              className="text-[11px] font-black px-2 py-0.5 rounded-full text-white flex-shrink-0"
+              style={{ background: cfg.badge }}
+            >
+              {cfg.sym} {cfg.label}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Map deck background_image key → filename (default: PAKMAKDECK.PNG)
+function getDeckImage(deck: Deck): string {
+  if (deck.background_image === 'DANNYDECK') return 'DANNYDECK.PNG'
+  return 'PAKMAKDECK.PNG'
+}
+
 function InventoryPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [decks, setDecks] = useState<Deck[]>([])
@@ -60,11 +177,12 @@ function InventoryPage() {
   const [, setCarouselIndex] = useState(0)
   const [, setCarouselLoading] = useState(false)
   const [fadedCards, setFadedCards] = useState<Set<number>>(new Set())
+  const [carouselNotification, setCarouselNotification] = useState<InventoryItem | null>(null)
   const [uploadingDeckId, setUploadingDeckId] = useState<number | null>(null)
   const [importModal, setImportModal] = useState<{ deckName: string; phase: number } | null>(null)
   const [importResult, setImportResult] = useState<{ imported: number; updated: number; not_found: number } | null>(null)
-  const [deckModal, setDeckModal] = useState<{ mode: 'create' | 'rename'; deck?: Deck; name: string } | null>(null)
-  const [deckStats, setDeckStats] = useState<{ total_items: number; total_quantity: number; total_value: number; low_stock: number } | null>(null)
+  const [deckModal, setDeckModal] = useState<{ mode: 'create' | 'rename'; deck?: Deck; name: string; background_image: 'PAKMAKDECK' | 'DANNYDECK' } | null>(null)
+  const [_deckStats, setDeckStats] = useState<{ total_items: number; total_quantity: number; total_value: number; low_stock: number } | null>(null)
   
   // Scanner state
   const [scannerOpen, setScannerOpen] = useState(false)
@@ -263,7 +381,10 @@ function InventoryPage() {
     if (!deckModal?.name.trim()) return
     
     try {
-      const response = await apiClient.post('/decks/', { name: deckModal.name.trim() })
+      const response = await apiClient.post('/decks/', {
+        name: deckModal.name.trim(),
+        background_image: deckModal.background_image,
+      })
       const newDeck = response.data
       setDecks(prev => [...prev, newDeck])
       setSelectedDeck(newDeck)
@@ -280,7 +401,10 @@ function InventoryPage() {
     if (!deckModal?.deck || !deckModal.name.trim()) return
     
     try {
-      const response = await apiClient.patch(`/decks/${deckModal.deck.id}/`, { name: deckModal.name.trim() })
+      const response = await apiClient.patch(`/decks/${deckModal.deck.id}/`, {
+        name: deckModal.name.trim(),
+        background_image: deckModal.background_image,
+      })
       const updatedDeck = response.data
       setDecks(prev => prev.map(d => d.id === updatedDeck.id ? updatedDeck : d))
       if (selectedDeck?.id === updatedDeck.id) {
@@ -336,6 +460,16 @@ function InventoryPage() {
       setInventory(prev => prev.map(item => 
         item.auction_code === code ? { ...item, sold_at: new Date().toISOString() } : item
       ))
+      // Also cross out the card in the carousel animation if it is open
+      setCarouselCards(prev => {
+        const updated = prev.map(item =>
+          item.auction_code === code ? { ...item, sold_at: new Date().toISOString() } : item
+        )
+        // Fire pull notification if the carousel is open and this card belongs to it
+        const hit = updated.find(item => item.auction_code === code)
+        if (hit) setCarouselNotification(hit)
+        return updated
+      })
       // Invalidate the homepage recent-scans cache so it refreshes immediately
       queryClient.invalidateQueries({ queryKey: ['recent-scans'] })
       // Refresh deck prestige stats (a card was sold, pull rates change live)
@@ -383,6 +517,10 @@ function InventoryPage() {
       setInventory(prev => prev.map(item => 
         item.auction_code === lastSoldCard.auction_code ? { ...item, sold_at: null } : item
       ))
+      // Also restore the card in the carousel animation if it is open
+      setCarouselCards(prev => prev.map(item =>
+        item.auction_code === lastSoldCard.auction_code ? { ...item, sold_at: null } : item
+      ))
     } catch (error: any) {
       setToast({ message: error.response?.data?.error || 'Failed to undo sale', type: 'error' })
     }
@@ -427,10 +565,6 @@ function InventoryPage() {
   }, [scannerOpen])
 
   // Use stats from API (accurate for entire deck)
-  const totalItems = deckStats?.total_items || totalCount
-  const totalQuantity = deckStats?.total_quantity || 0
-  const totalValue = deckStats?.total_value || 0
-  const lowStockItems = deckStats?.low_stock || 0
 
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE)
 
@@ -460,98 +594,7 @@ function InventoryPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Page Header - Pokemon themed */}
-      <div 
-        className="relative overflow-hidden rounded-2xl p-5 sm:p-6 animate-slide-down"
-        style={{
-          background: 'linear-gradient(135deg, #059669 0%, #047857 100%)'
-        }}
-      >
-        {/* Decorative pokeball */}
-        <div className="absolute -right-10 -top-10 w-40 h-40 opacity-10">
-          <div className="w-full h-full rounded-full border-8 border-white relative">
-            <div className="absolute top-1/2 left-0 right-0 h-3 bg-white -translate-y-1/2" />
-          </div>
-        </div>
-        
-        <div className="relative z-10 flex items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Sparkles className="w-4 h-4 text-emerald-200" />
-              <span className="text-xs font-bold text-emerald-100 uppercase tracking-wider">Collection</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-white">
-              My Inventory
-            </h1>
-            <p className="text-emerald-100 text-sm mt-1">
-              {loading ? 'Loading...' : `${totalCount} cards in your collection`}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link 
-              to="/cards"
-              className="
-                flex items-center gap-2 px-4 py-2.5
-                bg-white/20 backdrop-blur-sm hover:bg-white/30
-                text-white text-sm font-bold
-                rounded-xl border border-white/20
-                transition-all active:scale-[0.98]
-              "
-            >
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Add Cards</span>
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats Summary - Pokemon themed */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-slide-down" style={{ animationDelay: '75ms' }}>
-        <div className="relative overflow-hidden bg-white rounded-2xl border-2 border-gray-100 p-4 shadow-sm hover:shadow-md transition-shadow">
-          <div className="absolute -right-4 -top-4 w-16 h-16 opacity-5">
-            <Package className="w-full h-full" />
-          </div>
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-              <Package className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-xs font-bold text-gray-500 uppercase">Unique</span>
-          </div>
-          <p className="text-2xl font-black text-gray-900">{totalItems.toLocaleString()}</p>
-        </div>
-        
-        <div className="relative overflow-hidden bg-white rounded-2xl border-2 border-gray-100 p-4 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <span className="text-white text-xs font-bold">#</span>
-            </div>
-            <span className="text-xs font-bold text-gray-500 uppercase">Total Qty</span>
-          </div>
-          <p className="text-2xl font-black text-gray-900">{totalQuantity.toLocaleString()}</p>
-        </div>
-        
-        <div className="relative overflow-hidden bg-white rounded-2xl border-2 border-gray-100 p-4 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-xs font-bold text-gray-500 uppercase">Value</span>
-          </div>
-          <p className="text-2xl font-black text-emerald-600">${totalValue.toFixed(2)}</p>
-        </div>
-        
-        <div className="relative overflow-hidden bg-white rounded-2xl border-2 border-gray-100 p-4 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg flex items-center justify-center">
-              <AlertTriangle className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-xs font-bold text-gray-500 uppercase">Low Stock</span>
-          </div>
-          <p className="text-2xl font-black text-amber-600">{lowStockItems}</p>
-        </div>
-      </div>
-
+    <div className="space-y-6 px-4 sm:px-6 lg:px-10 xl:px-16 2xl:px-24 py-6 pb-24 md:pb-8 min-h-screen">
       {/* Deck Selector */}
       <div className="animate-slide-down" style={{ animationDelay: '150ms' }}>
         {decks.length === 0 ? (
@@ -564,7 +607,7 @@ function InventoryPage() {
               Organize your card collection into decks. Create a deck to get started!
             </p>
             <button 
-              onClick={() => setDeckModal({ mode: 'create', name: '' })}
+              onClick={() => setDeckModal({ mode: 'create', name: '', background_image: 'PAKMAKDECK' })}
               className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-bold rounded-xl hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-lg"
             >
               <Plus className="w-5 h-5" />
@@ -572,8 +615,7 @@ function InventoryPage() {
             </button>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border-2 border-gray-100 p-5">
-            <h2 className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-3">Select Deck</h2>
+          <div className="rounded-2xl p-5 pt-10">
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {decks.map((deck) => (
                 <div
@@ -594,10 +636,17 @@ function InventoryPage() {
                       relative aspect-[3/4] rounded-2xl border-4 transition-all cursor-pointer
                       flex flex-col items-center justify-center p-4
                       ${selectedDeck?.id === deck.id 
-                        ? 'bg-gradient-to-br from-emerald-400 via-emerald-500 to-emerald-600 border-emerald-600 text-white shadow-2xl shadow-emerald-500/50 scale-105 -rotate-2' 
-                        : 'bg-gradient-to-br from-white via-gray-50 to-gray-100 border-gray-300 text-gray-700 hover:border-emerald-400 hover:shadow-xl hover:-translate-y-1'
+                        ? 'border-emerald-600 text-white shadow-2xl shadow-emerald-500/50 scale-105 -rotate-2' 
+                        : 'border-gray-300 text-gray-700 hover:border-emerald-400 hover:shadow-xl hover:-translate-y-1'
                       }
                     `}
+                    style={{
+                      backgroundImage: selectedDeck?.id === deck.id
+                        ? `linear-gradient(135deg, rgba(16,185,129,0.72) 0%, rgba(5,150,105,0.80) 100%), url(${import.meta.env.BASE_URL}images/${getDeckImage(deck)})`
+                        : `linear-gradient(135deg, rgba(255,255,255,0.70) 0%, rgba(243,244,246,0.78) 100%), url(${import.meta.env.BASE_URL}images/${getDeckImage(deck)})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                    }}
                   >
                     {/* Card back pattern - decorative lines */}
                     <div className={`absolute inset-0 rounded-xl overflow-hidden ${selectedDeck?.id === deck.id ? 'opacity-10' : 'opacity-5'}`}>
@@ -651,8 +700,17 @@ function InventoryPage() {
                           setCarouselIndex(0)
                           setFadedCards(new Set()) // Reset faded cards
                           try {
-                            const response = await apiClient.get(`/inventory/?deck=${deck.id}&page_size=1000`)
-                            setCarouselCards(response.data.results || [])
+                            const allCards: InventoryItem[] = []
+                            let url: string | null = `/inventory/?deck=${deck.id}&page_size=100`
+                            while (url) {
+                              const res: { data: { results: InventoryItem[]; next: string | null } } = await apiClient.get(url)
+                              allCards.push(...(res.data.results || []))
+                              const next: string | null = res.data.next
+                              if (!next) break
+                              const apiIndex: number = next.indexOf('/api/')
+                              url = apiIndex !== -1 ? next.slice(apiIndex + 4) : next.replace(/^https?:\/\/[^/]+/, '')
+                            }
+                            setCarouselCards(allCards)
                           } catch (error) {
                             console.error('Error fetching deck cards:', error)
                             setToast({ message: 'Failed to load deck cards', type: 'error' })
@@ -675,7 +733,7 @@ function InventoryPage() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          setDeckModal({ mode: 'rename', deck, name: deck.name })
+                          setDeckModal({ mode: 'rename', deck, name: deck.name, background_image: deck.background_image ?? 'PAKMAKDECK' })
                         }}
                         className={`
                           p-1.5 rounded-lg transition-all
@@ -815,7 +873,7 @@ function InventoryPage() {
               
               {/* Create New Deck Card */}
               <div
-                onClick={() => setDeckModal({ mode: 'create', name: '' })}
+                onClick={() => setDeckModal({ mode: 'create', name: '', background_image: 'PAKMAKDECK' })}
                 className="group relative cursor-pointer"
               >
                 {/* Main card */}
@@ -1392,6 +1450,43 @@ function InventoryPage() {
               }}
             />
 
+            {/* Background image picker — only shown when creating */}
+            {deckModal.mode === 'create' && (
+              <div className="mt-5">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Deck Background</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {(['PAKMAKDECK', 'DANNYDECK'] as const).map(img => (
+                    <button
+                      key={img}
+                      type="button"
+                      onClick={() => setDeckModal({ ...deckModal, background_image: img })}
+                      className={`relative rounded-xl overflow-hidden border-4 transition-all ${
+                        deckModal.background_image === img
+                          ? 'border-emerald-500 scale-[1.03] shadow-lg shadow-emerald-200'
+                          : 'border-gray-200 hover:border-gray-400'
+                      }`}
+                    >
+                      <img
+                        src={`${import.meta.env.BASE_URL}images/${img}.PNG`}
+                        alt={img}
+                        className="w-full aspect-[3/4] object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-2">
+                        <span className="text-white text-xs font-black">
+                          {img === 'PAKMAKDECK' ? 'Pakmak' : 'Danny'}
+                        </span>
+                      </div>
+                      {deckModal.background_image === img && (
+                        <div className="absolute top-2 right-2 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
+                          <span className="text-white text-[10px] font-black">✓</span>
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="flex gap-3 mt-6">
               <button
@@ -1566,7 +1661,7 @@ function InventoryPage() {
 
       {/* Carousel Modal */}
       {carouselDeck && carouselCards.length > 0 && (
-        <div className="fixed inset-0 z-50 bg-black/95 animate-fade-in overflow-hidden">
+        <div className="fixed inset-0 z-[60] bg-black/95 animate-fade-in overflow-hidden">
           {/* Close button */}
           <button
             onClick={() => {
@@ -1579,100 +1674,77 @@ function InventoryPage() {
             <X className="w-6 h-6" />
           </button>
 
-          {/* Deck title */}
-          <div className="absolute top-6 left-6 z-10">
-            <h2 className="text-3xl font-black text-white mb-1">{carouselDeck.name}</h2>
-            <p className="text-sm text-gray-400">
-              {carouselCards.length} cards in this deck
-            </p>
-          </div>
+          {/* Two-row scrolling layout — top: Rarion & Cosmos · bottom: Galaxy & Star */}
+          {(() => {
+            const renderRow = (rowCards: typeof carouselCards, cardWidth = 180, extraPaddingTop = 0) => {
+              if (rowCards.length === 0) return null
+              const doubled = [...rowCards, ...rowCards]
+              const slotWidth = cardWidth + 12 // card + gap-3
+              return (
+                <div className="flex-1 overflow-hidden flex items-center" style={{ paddingTop: extraPaddingTop }}>
+                  <div
+                    className="flex gap-3 px-4"
+                    style={{
+                      animation: `scroll-left ${rowCards.length * 3}s linear infinite`,
+                      width: `${doubled.length * slotWidth}px`,
+                    }}
+                  >
+                    {doubled.map((item, idx) => {
+                      const isFaded = fadedCards.has(item.id)
+                      const isSold  = !!item.sold_at
+                      return (
+                        <div
+                          key={`${item.id}-${idx}`}
+                          className="flex-shrink-0"
+                          style={{ width: `${cardWidth}px`, perspective: '1000px' }}
+                        >
+                          <div className="relative w-full aspect-[2.5/3.5]">
+                            <div className={`absolute inset-0 rounded-2xl overflow-hidden shadow-2xl ${isFaded ? 'opacity-30' : isSold ? 'opacity-40 grayscale' : 'opacity-100'}`}>
+                              <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
+                                {item.card_detail?.image ? (
+                                  <img src={item.card_detail.image} alt={item.card_detail?.name || 'Card'} className="w-full h-full object-contain" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <Package className="w-20 h-20 text-gray-400" />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            {isSold && (
+                              <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+                                <div className="bg-red-600/85 text-white font-black text-xl px-5 py-2 rounded-xl shadow-lg tracking-widest" style={{ transform: 'rotate(-18deg)' }}>
+                                  PULLED
+                                </div>
+                              </div>
+                            )}
 
-          {/* Scrolling cards container */}
-          <div className="h-full pt-24 pb-12 overflow-hidden">
-            <div 
-              className="flex gap-6 px-6 h-full items-center"
-              style={{
-                animation: `scroll-left ${carouselCards.length * 3}s linear infinite`,
-                width: `${carouselCards.length * 2 * 320}px`
-              }}
-            >
-              {/* Duplicate cards for seamless loop */}
-              {[...carouselCards, ...carouselCards].map((item, idx) => {
-                const isFaded = fadedCards.has(item.id)
-                return (
-                <div
-                  key={`${item.id}-${idx}`}
-                  className="flex-shrink-0"
-                  style={{ 
-                    width: '300px',
-                    perspective: '1000px'
-                  }}
-                  onClick={() => {
-                    setFadedCards(prev => {
-                      const newSet = new Set(prev)
-                      if (newSet.has(item.id)) {
-                        newSet.delete(item.id)
-                      } else {
-                        newSet.add(item.id)
-                      }
-                      return newSet
-                    })
-                  }}
-                >
-                  <div className="relative w-full aspect-[2.5/3.5] group">
-                    {/* Card container */}
-                    <div className={`absolute inset-0 rounded-2xl overflow-hidden shadow-2xl transform transition-all duration-300 hover:scale-105 hover:z-10 cursor-pointer ${
-                      isFaded ? 'opacity-30' : 'opacity-100'
-                    }`}>
-                      <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
-                        {item.card_detail?.image ? (
-                          <img
-                            src={item.card_detail.image}
-                            alt={item.card_detail?.name || 'Card'}
-                            className="w-full h-full object-contain"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Package className="w-20 h-20 text-gray-400" />
                           </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Card info overlay */}
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-4 rounded-b-2xl opacity-0 group-hover:opacity-100 transition-opacity">
-                      <h3 className="text-base font-black text-white mb-1 truncate">
-                        {item.card_detail?.name || 'Unknown Card'}
-                      </h3>
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="px-2 py-1 bg-white/20 text-white rounded font-bold truncate max-w-[150px]">
-                          {item.card_detail?.set_name || 'Unknown'}
-                        </span>
-                        <span className="px-2 py-1 bg-emerald-500/80 text-white rounded font-bold">
-                          x{item.quantity}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Prestige badge - always visible */}
-                    <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-full px-4">
-                      <div className={`
-                        inline-flex px-3 py-1.5 rounded-lg text-xs font-bold shadow-lg border-2 mx-auto
-                        ${prestigeColors[item.prestige] || prestigeColors.star}
-                      `}>
-                        {item.prestige_display || item.prestige}
-                      </div>
-                    </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
-              )})}
-            </div>
-          </div>
+              )
+            }
 
-          {/* Press ESC hint */}
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-gray-400 text-sm">
-            Press ESC to close
-          </div>
+            const topRow    = carouselCards.filter(c => c.prestige === 'rarion' || c.prestige === 'cosmos')
+            const bottomRow = carouselCards.filter(c => c.prestige !== 'rarion' && c.prestige !== 'cosmos')
+
+            return (
+              <div className="fixed inset-0 bg-black pt-10 pb-8 flex flex-col gap-4">
+                {renderRow(topRow, 220, 32)}
+                {renderRow(bottomRow, 160)}
+              </div>
+            )
+          })()}
+
+          {/* Pull notification — fires when a QR from this deck is scanned */}
+          {carouselNotification && (
+            <PullNotification
+              item={carouselNotification}
+              onDone={() => setCarouselNotification(null)}
+            />
+          )}
         </div>
       )}
     </div>

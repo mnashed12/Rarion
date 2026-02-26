@@ -251,18 +251,6 @@ function CardsPage() {
         </div>
         
         <div className="relative z-10 space-y-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Sparkles className="w-4 h-4 text-yellow-400" />
-              <span className="text-xs font-bold text-blue-200 uppercase tracking-wider">Card Database</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-white">
-              Browse Cards
-            </h1>
-            <p className="text-blue-200 text-sm mt-1">
-              {loading ? 'Loading...' : `${totalCount.toLocaleString()} cards available`}
-            </p>
-          </div>
 
           {/* Search Bar in Header */}
           <div className="flex gap-2">

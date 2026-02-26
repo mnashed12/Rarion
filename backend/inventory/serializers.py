@@ -16,7 +16,7 @@ class DeckSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Deck
-        fields = ['id', 'name', 'owner', 'created_at', 'updated_at', 'prestige_stats']
+        fields = ['id', 'name', 'background_image', 'owner', 'created_at', 'updated_at', 'prestige_stats']
         read_only_fields = ['id', 'owner', 'created_at', 'updated_at']
 
     def get_prestige_stats(self, obj):
