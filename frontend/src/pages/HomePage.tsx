@@ -12,9 +12,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Package, Sparkles } from 'lucide-react'
+import { Package, Sparkles, Trash2 } from 'lucide-react'
 import apiClient from '../services/api'
 import { InventoryItem } from '../types'
+import { useAuth } from '../contexts/AuthContext'
 
 // ── prestige config ───────────────────────────────────────────────────────────
 
@@ -221,7 +222,9 @@ function CardStrip({ cards, direction, rowHeight, align = 'center' }: StripProps
 // ── page ─────────────────────────────────────────────────────────────────────
 
 function HomePage() {
+  const { isInventoryAuthenticated } = useAuth()
   const [notification, setNotification] = useState<InventoryItem | null>(null)
+  const [hiddenIds, setHiddenIds] = useState<Set<number>>(new Set())
   const seenIds = useRef<Set<number>>(new Set())
   const initialized = useRef(false)
 
@@ -295,9 +298,10 @@ function HomePage() {
     )
   }
 
-  const rarionCards = recentCards.filter(c => c.prestige === 'rarion')
-  const cosmosCards = recentCards.filter(c => c.prestige === 'cosmos')
-  const otherCards  = recentCards.filter(c => c.prestige !== 'rarion' && c.prestige !== 'cosmos')
+  const visibleCards = recentCards.filter(c => !hiddenIds.has(c.id))
+  const rarionCards = visibleCards.filter(c => c.prestige === 'rarion')
+  const cosmosCards = visibleCards.filter(c => c.prestige === 'cosmos')
+  const otherCards  = visibleCards.filter(c => c.prestige !== 'rarion' && c.prestige !== 'cosmos')
 
   return (
     <>
@@ -339,10 +343,20 @@ function HomePage() {
             Not affiliated with Nintendo or The Pokémon Company International.
           </span>
 
-          {/* Right: legal links */}
+          {/* Right: legal links + admin clear */}
           <div className="flex items-center gap-4">
             <Link to="/tos"     className="text-white/35 hover:text-white/70 text-[10px] font-medium transition-colors">Terms</Link>
             <Link to="/privacy" className="text-white/35 hover:text-white/70 text-[10px] font-medium transition-colors">Privacy</Link>
+            {isInventoryAuthenticated && (
+              <button
+                onClick={() => setHiddenIds(new Set(recentCards.map(c => c.id)))}
+                title="Clear homepage cards"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-white/35 hover:text-red-400 hover:bg-red-500/10 transition-all text-[10px] font-medium border border-transparent hover:border-red-500/20"
+              >
+                <Trash2 className="w-3 h-3" />
+                Clear
+              </button>
+            )}
           </div>
         </div>
       </div>
