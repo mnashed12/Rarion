@@ -57,6 +57,12 @@ apiClient.interceptors.request.use(
         config.headers['X-CSRFToken'] = csrfToken
       }
     }
+
+    // Attach current user identity so the backend can isolate per-user data
+    const appUser = localStorage.getItem('app_user')
+    if (appUser) {
+      config.headers['X-App-User'] = appUser
+    }
     
     // Log requests in development
     if (import.meta.env.DEV) {

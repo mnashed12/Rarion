@@ -40,6 +40,20 @@ from .filters import (
 logger = logging.getLogger(__name__)
 
 
+def _get_request_owner(request):
+    """
+    Read the X-App-User request header and return the matching Django User.
+    Accepted values (case-insensitive): 'mina', 'danny'.
+    Returns None when the header is absent or unrecognised.
+    """
+    from django.contrib.auth import get_user_model
+    username = (request.headers.get('X-App-User') or '').strip().lower()
+    if username in ('mina', 'danny'):
+        User = get_user_model()
+        return User.objects.filter(username=username).first()
+    return None
+
+
 class PokemonSetViewSet(viewsets.ModelViewSet):
     """
     API ViewSet for Pokemon Sets.
@@ -207,7 +221,14 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
     search_fields = ['sku', 'card__name', 'location', 'notes', 'card__pokemon_set__name']
     ordering_fields = ['created_at', 'quantity', 'current_price', 'condition', 'card__name', 'prestige']
     ordering = ['-created_at']
-    
+
+    def get_queryset(self):
+        owner = _get_request_owner(self.request)
+        qs = InventoryItem.objects.select_related('card', 'card__pokemon_set').all()
+        if owner:
+            qs = qs.filter(deck__owner=owner)
+        return qs
+
     def perform_create(self, serializer):
         """Log inventory creation."""
         instance = serializer.save()
@@ -283,7 +304,10 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
         """
         from django.db.models import Case, Value, When
         deck_id = request.data.get('deck_id')  # optional - limit to one deck
+        owner = _get_request_owner(request)
         queryset = InventoryItem.objects.filter(current_price__gte=1)
+        if owner:
+            queryset = queryset.filter(deck__owner=owner)
         if deck_id:
             queryset = queryset.filter(deck_id=deck_id)
 
@@ -439,9 +463,12 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
         """
         from django.db.models import Q
 
+        owner = _get_request_owner(request)
+        qs = InventoryItem.objects.filter(deck__isnull=False, sold_at__isnull=True)
+        if owner:
+            qs = qs.filter(deck__owner=owner)
         rows = (
-            InventoryItem.objects
-            .filter(deck__isnull=False, sold_at__isnull=True)
+            qs
             .values('deck_id', 'prestige')
             .annotate(count=Count('id'))
         )
@@ -572,22 +599,18 @@ class DeckViewSet(viewsets.ModelViewSet):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     
     def get_queryset(self):
-        # For now, return all decks since auth is not implemented
-        # Later: filter by user when authentication is added
+        owner = _get_request_owner(self.request)
+        if owner:
+            return Deck.objects.filter(owner=owner)
         return Deck.objects.all()
     
     def perform_create(self, serializer):
-        # For now, use a default user ID of 1
-        # Later: use self.request.user when authentication is added
         from django.contrib.auth import get_user_model
-        User = get_user_model()
-        default_user = User.objects.first()
-        if default_user:
-            serializer.save(owner=default_user)
-        else:
-            # Create a default user if none exists
-            default_user = User.objects.create_user(username='default', password='default')
-            serializer.save(owner=default_user)
+        owner = _get_request_owner(self.request)
+        if not owner:
+            User = get_user_model()
+            owner = User.objects.filter(username='mina').first() or User.objects.first()
+        serializer.save(owner=owner)
     
     @action(detail=True, methods=['get'])
     def print_labels(self, request, pk=None):
@@ -794,7 +817,16 @@ class DeckViewSet(viewsets.ModelViewSet):
             decoded_file = csv_file.read().decode('utf-8')
             reader = csv.DictReader(io.StringIO(decoded_file))
         except Exception as e:
+            logger.error(f'[import_csv] Failed to read CSV for deck "{deck.name}": {e}')
             return Response({'error': f'Failed to read CSV: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Log headers so we can diagnose column-name mismatches
+        rows = list(reader)
+        logger.info(f'[import_csv] Deck="{deck.name}" file="{csv_file.name}" rows={len(rows)} headers={reader.fieldnames}')
+        if rows:
+            logger.info(f'[import_csv] First row sample: {dict(rows[0])}')
+        if len(rows) > 1:
+            logger.info(f'[import_csv] Second row sample: {dict(rows[1])}')
         
         # Clear deck if requested
         if clear_deck:
@@ -816,7 +848,7 @@ class DeckViewSet(viewsets.ModelViewSet):
         errors = 0
         not_found_cards = []
         
-        for row in reader:
+        for row in rows:
             try:
                 # Clean up values
                 card_name = row.get('Card Name', '').strip('"').strip()
@@ -842,6 +874,10 @@ class DeckViewSet(viewsets.ModelViewSet):
                 if not card:
                     not_found += 1
                     not_found_cards.append(f"{card_name} ({card_number}) - {set_name}")
+                    logger.warning(
+                        f'[import_csv] Not found: name="{card_name}" base_name="{re.sub(chr(40)+"[^)]*"+chr(41)+"$", "", card_name).strip()}" '
+                        f'number="{card_number}" set="{set_name}"'
+                    )
                     continue
                 
                 # Get or create inventory item
@@ -870,7 +906,14 @@ class DeckViewSet(viewsets.ModelViewSet):
                     
             except Exception as e:
                 errors += 1
-                logger.error(f'Error importing row: {e}')
+                logger.error(f'[import_csv] Error processing row {row}: {e}')
+        
+        logger.info(
+            f'[import_csv] Done deck="{deck.name}": imported={imported} updated={updated} '
+            f'not_found={not_found} errors={errors}'
+        )
+        if not_found_cards:
+            logger.warning(f'[import_csv] Not-found cards (first 20): {not_found_cards[:20]}')
         
         return Response({
             'success': True,

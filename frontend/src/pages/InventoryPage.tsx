@@ -180,7 +180,7 @@ function InventoryPage() {
   const [carouselNotification, setCarouselNotification] = useState<InventoryItem | null>(null)
   const [uploadingDeckId, setUploadingDeckId] = useState<number | null>(null)
   const [importModal, setImportModal] = useState<{ deckName: string; phase: number } | null>(null)
-  const [importResult, setImportResult] = useState<{ imported: number; updated: number; not_found: number } | null>(null)
+  const [importResult, setImportResult] = useState<{ imported: number; updated: number; not_found: number; not_found_cards?: string[] } | null>(null)
   const [deckModal, setDeckModal] = useState<{ mode: 'create' | 'rename'; deck?: Deck; name: string; background_image: 'PAKMAKDECK' | 'DANNYDECK' } | null>(null)
   const [_deckStats, setDeckStats] = useState<{ total_items: number; total_quantity: number; total_value: number; low_stock: number } | null>(null)
   
@@ -328,6 +328,7 @@ function InventoryPage() {
       })
       
       const result = response.data
+      console.log('[CSV Import] Full response:', result)
       clearInterval(messageInterval)
       setImportResult(result)
       
@@ -349,7 +350,8 @@ function InventoryPage() {
       }, 3000)
     } catch (error: any) {
       clearInterval(messageInterval)
-      console.error('Error uploading CSV:', error)
+      console.error('[CSV Import] Error:', error)
+      console.error('[CSV Import] Response data:', error.response?.data)
       setImportModal(null)
       setUploadingDeckId(null)
       setToast({ 
@@ -1620,6 +1622,14 @@ function InventoryPage() {
                   <div className="flex items-center justify-between bg-orange-500/20 rounded-xl p-3 border border-orange-500/30">
                     <span className="text-orange-300">Not Found</span>
                     <span className="text-2xl font-black text-orange-400">{importResult.not_found}</span>
+                  </div>
+                )}
+                {importResult.not_found_cards && importResult.not_found_cards.length > 0 && (
+                  <div className="bg-orange-500/10 rounded-xl p-3 border border-orange-500/20 max-h-32 overflow-y-auto">
+                    <p className="text-orange-300 text-xs font-bold mb-1 uppercase tracking-wide">Unmatched cards:</p>
+                    {importResult.not_found_cards.map((c: string, i: number) => (
+                      <p key={i} className="text-orange-200/70 text-[10px] font-mono truncate">{c}</p>
+                    ))}
                   </div>
                 )}
                 <p className="text-center text-gray-400 text-sm mt-4 animate-pulse">

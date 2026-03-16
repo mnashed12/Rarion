@@ -7,14 +7,14 @@ interface AppProtectedRouteProps {
 }
 
 export function AppProtectedRoute({ children }: AppProtectedRouteProps) {
-  const { isAppAuthenticated, loginToApp } = useAuth()
+  const { isInventoryAuthenticated, loginToInventory } = useAuth()
 
-  if (!isAppAuthenticated) {
+  if (!isInventoryAuthenticated) {
     return (
       <LoginModal
         title="Access Required"
         description="Please enter the password to access Rarion"
-        onSubmit={loginToApp}
+        onSubmit={loginToInventory}
         showClose={false}
       />
     )
