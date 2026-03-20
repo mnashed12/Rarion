@@ -7,7 +7,7 @@
  * - Condition badges with Pokemon colors
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { 
   Package, 
@@ -24,7 +24,6 @@ import {
   Play,
   Upload,
   FolderPlus,
-  FileUp,
   Printer,
   QrCode,
   Undo2,
@@ -190,7 +189,6 @@ function InventoryPage() {
   const [scannerDeck, setScannerDeck] = useState<Deck | null>(null)
   const [lastSoldCard, setLastSoldCard] = useState<{ name: string; auction_code: string } | null>(null)
   const scannerRef = useRef<Html5Qrcode | null>(null)
-  const csvImportRef = useRef<HTMLInputElement | null>(null)
   const queryClient = useQueryClient()
   const [assigningPrestige, setAssigningPrestige] = useState(false)
 
@@ -362,57 +360,6 @@ function InventoryPage() {
       })
     }
   }
-
-  // Upload a CSV file and create a brand-new deck from it
-  const handleImportNewDeck = useCallback(async (file: File) => {
-    const deckName = file.name.replace(/\.csv$/i, '').trim() || 'Imported Deck'
-    setImportResult(null)
-    setImportModal({ deckName, phase: 0 })
-
-    const messageInterval = setInterval(() => {
-      setImportModal(prev => prev ? { ...prev, phase: (prev.phase + 1) % importMessages.length } : null)
-    }, 800)
-
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('name', deckName)
-
-      const response = await apiClient.post('/decks/create_from_csv/', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 300000,
-      })
-
-      const result = response.data
-      clearInterval(messageInterval)
-      setImportResult({
-        imported: result.imported,
-        updated: result.updated,
-        not_found: result.not_found,
-        not_found_cards: result.not_found_cards,
-      })
-
-      await refreshDecks()
-      // Auto-select the newly created deck
-      if (result.deck?.id) {
-        setSelectedDeck(result.deck)
-        setPage(1)
-      }
-
-      setTimeout(() => {
-        setImportModal(null)
-        setImportResult(null)
-      }, 3000)
-    } catch (error: any) {
-      clearInterval(messageInterval)
-      console.error('[CSV New Deck] Error:', error)
-      setImportModal(null)
-      setToast({
-        message: error.response?.data?.error || 'Failed to create deck from CSV',
-        type: 'error',
-      })
-    }
-  }, [decks])
 
   // Merge prestige stats from /inventory/prestige_by_deck/ into a deck list
   const mergePrestigeStats = (deckList: Deck[], statsMap: Record<number, { star: number; galaxy: number; cosmos: number; rarion: number; total: number }>): Deck[] =>
@@ -926,45 +873,6 @@ function InventoryPage() {
                 </div>
               ))}
               
-              {/* Import CSV as New Deck Card */}
-              <div
-                onClick={() => csvImportRef.current?.click()}
-                className="group relative cursor-pointer"
-              >
-                <div
-                  className="
-                    relative aspect-[3/4] rounded-2xl border-4 border-dashed transition-all
-                    flex flex-col items-center justify-center p-4
-                    bg-gradient-to-br from-blue-50 via-white to-blue-50 border-blue-200 text-blue-400
-                    hover:border-blue-400 hover:text-blue-600 hover:shadow-xl hover:-translate-y-1
-                    hover:bg-gradient-to-br hover:from-blue-100 hover:via-white hover:to-blue-100
-                  "
-                >
-                  <div className="w-12 h-12 rounded-full bg-blue-100 group-hover:bg-blue-200 flex items-center justify-center mb-3 transition-colors">
-                    <FileUp className="w-6 h-6" />
-                  </div>
-                  <h3 className="font-bold text-sm text-center">
-                    Import CSV
-                  </h3>
-                  <p className="text-[10px] text-center mt-1 opacity-70 leading-tight">
-                    Creates a new deck
-                  </p>
-                </div>
-                <input
-                  ref={csvImportRef}
-                  type="file"
-                  accept=".csv"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) {
-                      handleImportNewDeck(file)
-                      e.target.value = ''
-                    }
-                  }}
-                />
-              </div>
-
               {/* Create New Deck Card */}
               <div
                 onClick={() => setDeckModal({ mode: 'create', name: '', background_image: 'PAKMAKDECK' })}
