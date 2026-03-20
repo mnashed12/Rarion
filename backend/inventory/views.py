@@ -947,7 +947,165 @@ class DeckViewSet(viewsets.ModelViewSet):
             'not_found_cards': not_found_cards[:20],  # First 20
             'deck': deck.name
         })
-    
+
+    @action(detail=False, methods=['post'], url_path='create_from_csv')
+    def create_from_csv(self, request):
+        """
+        Create a new deck and import cards from an export.csv file in one step.
+
+        Expects multipart form:
+          - file  : the CSV file
+          - name  : deck name (falls back to filename stem)
+          - background_image : optional, defaults to 'PAKMAKDECK'
+
+        Supports both the legacy format and the new export.csv format
+        (detected automatically by column headers).
+        """
+        import csv
+        import io
+        import re
+        from decimal import Decimal
+
+        if 'file' not in request.FILES:
+            return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+        csv_file = request.FILES['file']
+
+        # Deck name: explicit param → filename stem → 'Imported Deck'
+        import os
+        deck_name = (request.data.get('name') or '').strip()
+        if not deck_name:
+            deck_name = os.path.splitext(csv_file.name)[0].strip() or 'Imported Deck'
+
+        background_image = request.data.get('background_image', 'PAKMAKDECK')
+        if background_image not in ('PAKMAKDECK', 'DANNYDECK'):
+            background_image = 'PAKMAKDECK'
+
+        # Read CSV
+        try:
+            decoded_file = csv_file.read().decode('utf-8')
+            reader = csv.DictReader(io.StringIO(decoded_file))
+        except Exception as e:
+            logger.error(f'[create_from_csv] Failed to read CSV: {e}')
+            return Response({'error': f'Failed to read CSV: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        rows = list(reader)
+        headers = reader.fieldnames or []
+        logger.info(f'[create_from_csv] file="{csv_file.name}" rows={len(rows)} headers={headers}')
+
+        # Detect format
+        is_export_format = 'Product Name' in headers
+
+        market_price_col = 'Market Price'
+        if is_export_format:
+            for h in headers:
+                if h.startswith('Market Price'):
+                    market_price_col = h
+                    break
+
+        logger.info(f'[create_from_csv] format={"export" if is_export_format else "legacy"}, market_price_col="{market_price_col}"')
+
+        # Create the deck
+        owner = _get_request_owner(request)
+        if not owner:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            owner = User.objects.filter(username='mina').first() or User.objects.first()
+
+        deck = Deck.objects.create(
+            name=deck_name,
+            background_image=background_image,
+            owner=owner,
+        )
+        logger.info(f'[create_from_csv] Created deck id={deck.id} name="{deck.name}" owner="{owner.username}"')
+
+        condition_map = {
+            'mint': 'mint',
+            'near mint': 'near_mint',
+            'lightly played': 'lightly_played',
+            'moderately played': 'moderately_played',
+            'heavily played': 'heavily_played',
+            'damaged': 'damaged',
+        }
+
+        imported = updated = not_found = errors = 0
+        not_found_cards = []
+
+        for row in rows:
+            try:
+                if is_export_format:
+                    card_name          = row.get('Product Name', '').strip('"').strip()
+                    card_number        = row.get('Card Number', '').strip('"').strip()
+                    set_name           = row.get('Set', '').strip('"').strip()
+                    condition_str      = row.get('Card Condition', 'near mint').strip('"').strip().lower()
+                    quantity           = int(row.get('Quantity', 1) or 1)
+                    variation          = row.get('Variance', '').strip('"').strip()
+                    market_price_str   = row.get(market_price_col, '').replace('$', '').replace(',', '').strip()
+                    purchase_price_str = row.get('Average Cost Paid', '').replace('$', '').replace(',', '').strip()
+                else:
+                    card_name          = row.get('Card Name', '').strip('"').strip()
+                    card_number        = row.get('Number', '').strip('"').strip()
+                    set_name           = row.get('Set', '').strip('"').strip()
+                    condition_str      = row.get('Condition', 'near mint').strip('"').strip().lower()
+                    quantity           = int(row.get('Quantity', 1) or 1)
+                    variation          = row.get('Variation', '').strip('"').strip()
+                    market_price_str   = row.get('Market Price', '').replace('$', '').replace(',', '').strip()
+                    purchase_price_str = row.get('Acquisition Price', '').replace('$', '').replace(',', '').strip()
+
+                if not card_name:
+                    continue
+
+                market_price   = Decimal(market_price_str)   if market_price_str   else None
+                purchase_price = Decimal(purchase_price_str) if purchase_price_str else None
+                condition      = condition_map.get(condition_str, 'near_mint')
+
+                card = self._find_card(card_name, card_number, set_name)
+
+                if not card:
+                    not_found += 1
+                    not_found_cards.append(f'{card_name} ({card_number}) - {set_name}')
+                    logger.warning(f'[create_from_csv] Not found: "{card_name}" #{card_number} set="{set_name}"')
+                    continue
+
+                inventory_item, inv_created = InventoryItem.objects.get_or_create(
+                    card=card,
+                    condition=condition,
+                    deck=deck,
+                    defaults={
+                        'quantity': quantity,
+                        'purchase_price': purchase_price,
+                        'current_price': market_price,
+                        'notes': f'Imported from CSV. Variation: {variation}' if variation else 'Imported from CSV',
+                    }
+                )
+                if inv_created:
+                    imported += 1
+                else:
+                    inventory_item.quantity += quantity
+                    if purchase_price:
+                        inventory_item.purchase_price = purchase_price
+                    if market_price:
+                        inventory_item.current_price = market_price
+                    inventory_item.save()
+                    updated += 1
+
+            except Exception as e:
+                errors += 1
+                logger.error(f'[create_from_csv] Row error: {e} — row={row}')
+
+        logger.info(f'[create_from_csv] Done: imported={imported} updated={updated} not_found={not_found} errors={errors}')
+
+        from .serializers import DeckSerializer
+        return Response({
+            'success': True,
+            'deck': DeckSerializer(deck).data,
+            'imported': imported,
+            'updated': updated,
+            'not_found': not_found,
+            'errors': errors,
+            'not_found_cards': not_found_cards[:20],
+        }, status=status.HTTP_201_CREATED)
+
     def _find_card(self, card_name, card_number, set_name):
         """Find a matching card in the database using multiple strategies."""
         import re
