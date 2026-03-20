@@ -873,7 +873,10 @@ class DeckViewSet(viewsets.ModelViewSet):
                     card_number   = row.get('Card Number', '').strip('"').strip()
                     set_name      = row.get('Set', '').strip('"').strip()
                     condition_str = row.get('Card Condition', 'near mint').strip('"').strip().lower()
-                    quantity      = int(row.get('Quantity', 1) or 1)
+                    try:
+                        quantity = int(float(row.get('Quantity', 1) or 1))
+                    except (ValueError, TypeError):
+                        quantity = 1
                     variation     = row.get('Variance', '').strip('"').strip()
                     market_price_str   = row.get(market_price_col, '').replace('$', '').replace(',', '').strip()
                     purchase_price_str = row.get('Average Cost Paid', '').replace('$', '').replace(',', '').strip()
@@ -882,13 +885,22 @@ class DeckViewSet(viewsets.ModelViewSet):
                     card_number   = row.get('Number', '').strip('"').strip()
                     set_name      = row.get('Set', '').strip('"').strip()
                     condition_str = row.get('Condition', 'near mint').strip('"').strip().lower()
-                    quantity      = int(row.get('Quantity', 1) or 1)
+                    try:
+                        quantity = int(float(row.get('Quantity', 1) or 1))
+                    except (ValueError, TypeError):
+                        quantity = 1
                     variation     = row.get('Variation', '').strip('"').strip()
                     market_price_str   = row.get('Market Price', '').replace('$', '').replace(',', '').strip()
                     purchase_price_str = row.get('Acquisition Price', '').replace('$', '').replace(',', '').strip()
                 
-                market_price = Decimal(market_price_str) if market_price_str else None
-                purchase_price = Decimal(purchase_price_str) if purchase_price_str else None
+                try:
+                    market_price = Decimal(market_price_str) if market_price_str else None
+                except Exception:
+                    market_price = None
+                try:
+                    purchase_price = Decimal(purchase_price_str) if purchase_price_str else None
+                except Exception:
+                    purchase_price = None
 
                 if not card_name:
                     continue
