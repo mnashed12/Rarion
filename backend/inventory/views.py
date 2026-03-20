@@ -848,9 +848,11 @@ class DeckViewSet(viewsets.ModelViewSet):
         errors = 0
         not_found_cards = []
         
-        # Detect CSV format by inspecting headers
+        # Detect CSV format:
+        # - export.csv has 'Product Name' column
+        # - allcards.csv has 'Card Name' column (and 'Binder')
         headers = reader.fieldnames or []
-        is_export_format = 'Product Name' in headers  # new export.csv format
+        is_export_format = 'Product Name' in headers and 'Card Name' not in headers
 
         # For export.csv the market price column has a dynamic date suffix
         # e.g. "Market Price (As of 2026-03-16)" — find it once up front
@@ -954,7 +956,10 @@ class DeckViewSet(viewsets.ModelViewSet):
     def _find_card(self, card_name, card_number, set_name):
         """Find a matching card in the database using multiple strategies."""
         import re
-        
+
+        if not card_name or not card_name.strip():
+            return None
+
         # Clean up the card name (remove parenthetical variations)
         base_name = re.sub(r'\s*\([^)]*\)\s*$', '', card_name).strip()
         
@@ -985,21 +990,24 @@ class DeckViewSet(viewsets.ModelViewSet):
             return card
         
         # Strategy 3: Match by card number and set name
-        card = Card.objects.filter(
-            Q(card_number__iexact=clean_number) | Q(card_number__iexact=normalized_number),
-            pokemon_set__name__icontains=set_name.split()[0]
-        ).filter(
-            Q(name__icontains=base_name.split()[0]) | Q(name__icontains=base_name)
-        ).exclude(image__isnull=True).exclude(image='').first()
-        if card:
-            return card
-        
+        set_word = set_name.split()[0] if set_name.split() else None
+        base_word = base_name.split()[0] if base_name.split() else None
+        if set_word and base_word:
+            card = Card.objects.filter(
+                Q(card_number__iexact=clean_number) | Q(card_number__iexact=normalized_number),
+                pokemon_set__name__icontains=set_word
+            ).filter(
+                Q(name__icontains=base_word) | Q(name__icontains=base_name)
+            ).exclude(image__isnull=True).exclude(image='').first()
+            if card:
+                return card
+
         # Strategy 4: Fuzzy match on name, exact on number
         card = Card.objects.filter(
             Q(card_number__iexact=clean_number) | Q(card_number__iexact=normalized_number)
         ).filter(
-            name__icontains=base_name.split()[0]
-        ).exclude(image__isnull=True).exclude(image='').first()
+            name__icontains=base_word or base_name
+        ).exclude(image__isnull=True).exclude(image='').first() if (base_word or base_name) else None
         if card:
             return card
         
