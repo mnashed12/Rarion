@@ -832,7 +832,7 @@ class DeckViewSet(viewsets.ModelViewSet):
         if clear_deck:
             InventoryItem.objects.filter(deck=deck).delete()
         
-        # Condition mapping
+        # Condition mapping — .lower() is applied before lookup so title case is handled
         condition_map = {
             'mint': 'mint',
             'near mint': 'near_mint',
@@ -848,19 +848,42 @@ class DeckViewSet(viewsets.ModelViewSet):
         errors = 0
         not_found_cards = []
         
+        # Detect CSV format by inspecting headers
+        headers = reader.fieldnames or []
+        is_export_format = 'Product Name' in headers  # new export.csv format
+
+        # For export.csv the market price column has a dynamic date suffix
+        # e.g. "Market Price (As of 2026-03-16)" — find it once up front
+        market_price_col = 'Market Price'  # default (old format)
+        if is_export_format:
+            for h in headers:
+                if h.startswith('Market Price'):
+                    market_price_col = h
+                    break
+
+        logger.info(f'[import_csv] Detected format: {"export.csv" if is_export_format else "legacy"}, market_price_col="{market_price_col}"')
+
         for row in rows:
             try:
-                # Clean up values
-                card_name = row.get('Card Name', '').strip('"').strip()
-                card_number = row.get('Number', '').strip('"').strip()
-                set_name = row.get('Set', '').strip('"').strip()
-                condition_str = row.get('Condition', 'near mint').strip('"').strip().lower()
-                quantity = int(row.get('Quantity', 1))
-                variation = row.get('Variation', '').strip('"').strip()
-                
-                # Parse prices
-                market_price_str = row.get('Market Price', '').replace('$', '').strip()
-                purchase_price_str = row.get('Acquisition Price', '').replace('$', '').strip()
+                # ── field extraction — handles both CSV formats ──────────────
+                if is_export_format:
+                    card_name     = row.get('Product Name', '').strip('"').strip()
+                    card_number   = row.get('Card Number', '').strip('"').strip()
+                    set_name      = row.get('Set', '').strip('"').strip()
+                    condition_str = row.get('Card Condition', 'near mint').strip('"').strip().lower()
+                    quantity      = int(row.get('Quantity', 1) or 1)
+                    variation     = row.get('Variance', '').strip('"').strip()
+                    market_price_str   = row.get(market_price_col, '').replace('$', '').replace(',', '').strip()
+                    purchase_price_str = row.get('Average Cost Paid', '').replace('$', '').replace(',', '').strip()
+                else:
+                    card_name     = row.get('Card Name', '').strip('"').strip()
+                    card_number   = row.get('Number', '').strip('"').strip()
+                    set_name      = row.get('Set', '').strip('"').strip()
+                    condition_str = row.get('Condition', 'near mint').strip('"').strip().lower()
+                    quantity      = int(row.get('Quantity', 1) or 1)
+                    variation     = row.get('Variation', '').strip('"').strip()
+                    market_price_str   = row.get('Market Price', '').replace('$', '').replace(',', '').strip()
+                    purchase_price_str = row.get('Acquisition Price', '').replace('$', '').replace(',', '').strip()
                 
                 market_price = Decimal(market_price_str) if market_price_str else None
                 purchase_price = Decimal(purchase_price_str) if purchase_price_str else None
