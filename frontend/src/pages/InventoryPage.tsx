@@ -1092,11 +1092,19 @@ function InventoryPage() {
         {failedCards && failedCards.deckId === selectedDeck.id && failedCardsVisible && (
           <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-4">
             <div className="flex items-start justify-between gap-3">
-              <div className="flex-1">
-                <p className="text-orange-700 font-bold text-sm mb-2">
-                  ⚠ {failedCards.cards.length} card{failedCards.cards.length !== 1 ? 's' : ''} not found in the database — add them manually:
-                </p>
-                <div className="space-y-1 max-h-32 overflow-y-auto">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 mb-2 flex-wrap">
+                  <p className="text-orange-700 font-bold text-sm">
+                    ⚠ {failedCards.cards.length} card{failedCards.cards.length !== 1 ? 's' : ''} not found in the database — add them manually:
+                  </p>
+                  <button
+                    onClick={() => setFailedCards(null)}
+                    className="text-xs text-red-500 hover:text-red-700 font-semibold underline flex-shrink-0"
+                  >
+                    Clear all
+                  </button>
+                </div>
+                <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
                   {failedCards.cards.map((card, i) => {
                     const namePart = card.split(' (')[0]
                     return (
@@ -1119,8 +1127,8 @@ function InventoryPage() {
               </div>
               <button
                 onClick={() => setFailedCardsVisible(false)}
-                className="p-1 text-orange-400 hover:text-orange-600"
-                title="Hide (list is saved)"
+                className="p-1 text-orange-400 hover:text-orange-600 flex-shrink-0"
+                title="Hide (list is saved — use the ⚠ button to reopen)"
               >
                 <X className="w-4 h-4" />
               </button>

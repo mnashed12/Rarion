@@ -905,16 +905,31 @@ class DeckViewSet(viewsets.ModelViewSet):
             m = _re.match(r'^0*(\d+)/0*(\d+)$', num)
             return f"{m.group(1)}/{m.group(2)}" if m else num
 
+        def _num_prefix(num_str):
+            """Strip the '/total' part and remove leading zeros from numeric prefix.
+            '001/189' → '1', 'TG01/TG30' → 'tg01', '43a' → '43a'
+            """
+            prefix = num_str.split('/')[0].strip().lower()
+            # Strip leading zeros only when the prefix is purely numeric
+            m = _re.match(r'^0+(\d+)$', prefix)
+            return m.group(1) if m else prefix
+
         _by_name_num = {}   # (name_lower, number_lower) -> [card]
         _by_num      = {}   # number_lower -> [card]
+        _by_num_pfx  = {}   # number-prefix-lower -> [card]  (e.g. "1" for "1/189")
         _by_name     = {}   # name_lower   -> [card]
 
         for _c in _all_cards:
-            _nl  = _mk(_c.name)
-            _num = _mk(_c.card_number)
+            _nl   = _mk(_c.name)
+            _num  = _mk(_c.card_number)
+            _pfx  = _num_prefix(_c.card_number)
             _by_name.setdefault(_nl, []).append(_c)
             _by_num.setdefault(_num, []).append(_c)
+            _by_num_pfx.setdefault(_pfx, []).append(_c)
             _by_name_num.setdefault((_nl, _num), []).append(_c)
+            # Also index by (name, prefix) so strategy 1 can use prefix
+            if _pfx != _num:
+                _by_name_num.setdefault((_nl, _pfx), []).append(_c)
 
         def find_card_fast(card_name, card_number, set_name):
             if not card_name or not card_name.strip():
@@ -922,23 +937,28 @@ class DeckViewSet(viewsets.ModelViewSet):
             base_name = _re.sub(r'\s*\([^)]*\)\s*$', '', card_name).strip()
             clean_num = _mk(card_number) if card_number else ''
             norm_num  = _mk(_normalize_num(card_number.strip())) if card_number and card_number.strip() else ''
+            pfx_num   = _num_prefix(card_number) if card_number else ''
             name_low  = _mk(card_name)
             base_low  = _mk(base_name)
             set_low   = _mk(set_name)
             set_parts = set_low.split()
             set_word  = set_parts[0] if set_parts else ''
 
-            # Strategy 1 & 2: exact name + exact/normalised number
-            for num_key in dict.fromkeys([clean_num, norm_num]):  # dedup, keep order
-                for nk in dict.fromkeys([name_low, base_low]):
+            # All number variants we should try (deduped, ordered)
+            num_keys = list(dict.fromkeys([clean_num, norm_num, pfx_num]))
+            name_keys = list(dict.fromkeys([name_low, base_low]))
+
+            # Strategy 1 & 2: exact name + any number variant
+            for num_key in num_keys:
+                for nk in name_keys:
                     cards = _by_name_num.get((nk, num_key), [])
                     if cards:
                         return _best(cards)
 
             # Strategy 3: number + set word + first word of name
-            for num_key in dict.fromkeys([clean_num, norm_num]):
-                first_word = base_low.split()[0] if base_low.split() else ''
-                candidates = _by_num.get(num_key, [])
+            first_word = base_low.split()[0] if base_low.split() else ''
+            for num_key in num_keys:
+                candidates = _by_num.get(num_key) or _by_num_pfx.get(num_key, [])
                 filtered = [
                     c for c in candidates
                     if (not set_word or set_word in _mk(c.pokemon_set.name))
@@ -948,26 +968,27 @@ class DeckViewSet(viewsets.ModelViewSet):
                     return _best(filtered)
 
             # Strategy 4: number + first word of name (no set filter)
-            for num_key in dict.fromkeys([clean_num, norm_num]):
-                first_word = base_low.split()[0] if base_low.split() else ''
+            for num_key in num_keys:
+                candidates = _by_num.get(num_key) or _by_num_pfx.get(num_key, [])
                 filtered = [
-                    c for c in _by_num.get(num_key, [])
+                    c for c in candidates
                     if first_word and first_word in c.name.lower()
                 ]
                 if filtered:
                     return _best(filtered)
 
             # Strategy 5: promo sets
-            if 'promo' in set_low or len(clean_num) <= 4:
-                filtered = [
-                    c for c in _by_name.get(base_low, [])
-                    if 'promo' in _mk(c.pokemon_set.name)
-                ]
-                if filtered:
-                    return _best(filtered)
+            if 'promo' in set_low or (clean_num and len(clean_num) <= 4):
+                for nk in name_keys:
+                    filtered = [
+                        c for c in _by_name.get(nk, [])
+                        if 'promo' in _mk(c.pokemon_set.name)
+                    ]
+                    if filtered:
+                        return _best(filtered)
 
             # Strategy 6: name-only fallback
-            for nk in dict.fromkeys([name_low, base_low]):
+            for nk in name_keys:
                 cards = _by_name.get(nk, [])
                 if cards:
                     return _best(cards)
@@ -1116,7 +1137,7 @@ class DeckViewSet(viewsets.ModelViewSet):
             'not_found': not_found,
             'errors': errors,
             'error_details': error_details[:10],
-            'not_found_cards': not_found_cards[:20],
+            'not_found_cards': not_found_cards,   # all of them, not first 20
             'deck': deck.name,
         })
 
