@@ -831,6 +831,16 @@ class DeckViewSet(viewsets.ModelViewSet):
         if clear_deck:
             InventoryItem.objects.filter(deck=deck).delete()
 
+        # ------------------------------------------------------------------
+        # Pre-load existing InventoryItems so we can decide create vs update
+        # without any per-row DB calls.
+        # Key: (card_id, condition) → item
+        # ------------------------------------------------------------------
+        existing_by_key: dict = {}
+        if not clear_deck:
+            for _item in InventoryItem.objects.filter(deck=deck).select_related('card'):
+                existing_by_key[(_item.card_id, _item.condition)] = _item
+
         condition_map = {
             'mint': 'mint',
             'near mint': 'near_mint',
@@ -970,6 +980,8 @@ class DeckViewSet(viewsets.ModelViewSet):
         errors = 0
         not_found_cards = []
         error_details = []
+        to_create: list = []
+        to_update: list = []
 
         for row in rows:
             try:
@@ -1039,39 +1051,59 @@ class DeckViewSet(viewsets.ModelViewSet):
                     logger.warning(f'[import_csv] Not found: "{card_name}" #{card_number} set="{set_name}"')
                     continue
 
-                inventory_item, inv_created = InventoryItem.objects.get_or_create(
-                    card=card,
-                    condition=condition,
-                    deck=deck,
-                    defaults={
-                        'quantity': quantity,
-                        'purchase_price': purchase_price,
-                        'current_price': market_price,
-                        'notes': notes_str,
-                        'grade': '' if grade.lower() == 'ungraded' else grade,
-                        'variance': variation,
-                        'rarity': rarity,
-                        'watchlist': watchlist,
-                        'date_added': date_added,
-                    }
-                )
-
-                if inv_created:
-                    imported += 1
-                else:
-                    inventory_item.quantity += quantity
+                key = (card.id, condition)
+                existing = existing_by_key.get(key)
+                if existing:
+                    existing.quantity += quantity
                     if purchase_price:
-                        inventory_item.purchase_price = purchase_price
+                        existing.purchase_price = purchase_price
                     if market_price:
-                        inventory_item.current_price = market_price
-                    inventory_item.save()
+                        existing.current_price = market_price
+                    to_update.append(existing)
                     updated += 1
+                else:
+                    new_item = InventoryItem(
+                        card=card,
+                        condition=condition,
+                        deck=deck,
+                        quantity=quantity,
+                        purchase_price=purchase_price,
+                        current_price=market_price,
+                        notes=notes_str,
+                        grade='' if grade.lower() == 'ungraded' else grade,
+                        variance=variation,
+                        rarity=rarity,
+                        watchlist=watchlist,
+                        date_added=date_added,
+                    )
+                    new_item.sku = new_item._generate_sku()
+                    # Track in existing_by_key so duplicate rows in the same
+                    # CSV don't create two items for the same (card, condition)
+                    existing_by_key[key] = new_item
+                    to_create.append(new_item)
+                    imported += 1
 
             except Exception as e:
                 errors += 1
                 msg = f'{type(e).__name__}: {e}'
                 error_details.append(msg)
                 logger.error(f'[import_csv] Error on row {row}: {e}')
+
+        # ------------------------------------------------------------------
+        # Flush to DB in two bulk queries instead of N individual queries
+        # ------------------------------------------------------------------
+        from django.db import transaction as _tx
+        with _tx.atomic():
+            if to_create:
+                InventoryItem.objects.bulk_create(to_create, batch_size=500)
+                logger.info(f'[import_csv] bulk_create {len(to_create)} items')
+            if to_update:
+                InventoryItem.objects.bulk_update(
+                    to_update,
+                    ['quantity', 'purchase_price', 'current_price'],
+                    batch_size=500,
+                )
+                logger.info(f'[import_csv] bulk_update {len(to_update)} items')
 
         logger.info(f'[import_csv] Done: imported={imported} updated={updated} not_found={not_found} errors={errors}')
         if not_found_cards:

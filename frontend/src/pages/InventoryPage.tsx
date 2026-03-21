@@ -30,6 +30,7 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  AlertTriangle,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Html5Qrcode } from 'html5-qrcode'
@@ -181,7 +182,13 @@ function InventoryPage() {
   const [uploadingDeckId, setUploadingDeckId] = useState<number | null>(null)
   const [importModal, setImportModal] = useState<{ deckName: string; phase: number } | null>(null)
   const [importResult, setImportResult] = useState<{ imported: number; updated: number; not_found: number; not_found_cards?: string[]; errors?: number; error_details?: string[] } | null>(null)
-  const [failedCards, setFailedCards] = useState<{ deckId: number; deckName: string; cards: string[] } | null>(null)
+  const [failedCards, setFailedCards] = useState<{ deckId: number; deckName: string; cards: string[] } | null>(() => {
+    try {
+      const stored = localStorage.getItem('pakmak_failed_cards')
+      return stored ? JSON.parse(stored) : null
+    } catch { return null }
+  })
+  const [failedCardsVisible, setFailedCardsVisible] = useState(true)
   const [manualAddModal, setManualAddModal] = useState<{ deckId: number; deckName: string; prefill?: string } | null>(null)
   const [manualAddForm, setManualAddForm] = useState({ name: '', set_name: '', card_number: '', condition: 'near_mint', quantity: '1', purchase_price: '', current_price: '', notes: '' })
   const [manualAddImage, setManualAddImage] = useState<File | null>(null)
@@ -197,6 +204,15 @@ function InventoryPage() {
   const queryClient = useQueryClient()
   const [assigningPrestige, setAssigningPrestige] = useState(false)
 
+
+  // Sync failedCards to localStorage whenever it changes
+  useEffect(() => {
+    if (failedCards) {
+      localStorage.setItem('pakmak_failed_cards', JSON.stringify(failedCards))
+    } else {
+      localStorage.removeItem('pakmak_failed_cards')
+    }
+  }, [failedCards])
 
   // Fun loading messages for import
   const importMessages = [
@@ -350,6 +366,7 @@ function InventoryPage() {
       // Persist failed cards so user can add them manually
       if (result.not_found_cards && result.not_found_cards.length > 0) {
         setFailedCards({ deckId: deckId, deckName: deck?.name || 'Deck', cards: result.not_found_cards })
+        setFailedCardsVisible(true)
       }
 
       // Auto-close after showing results
@@ -1055,10 +1072,24 @@ function InventoryPage() {
           >
             <Plus className="w-5 h-5" />
           </button>
+
+          {/* Failed cards re-open button — only visible when banner is hidden */}
+          {failedCards && failedCards.deckId === selectedDeck.id && !failedCardsVisible && (
+            <button
+              onClick={() => setFailedCardsVisible(true)}
+              className="relative flex items-center justify-center h-12 px-4 rounded-xl border-2 border-orange-300 bg-orange-50 text-orange-600 hover:bg-orange-100 font-bold transition-all active:scale-[0.98]"
+              title="Show unmatched cards"
+            >
+              <AlertTriangle className="w-5 h-5" />
+              <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-orange-500 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1">
+                {failedCards.cards.length}
+              </span>
+            </button>
+          )}
         </div>
 
         {/* Failed imports banner */}
-        {failedCards && failedCards.deckId === selectedDeck.id && (
+        {failedCards && failedCards.deckId === selectedDeck.id && failedCardsVisible && (
           <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1">
@@ -1087,8 +1118,9 @@ function InventoryPage() {
                 </div>
               </div>
               <button
-                onClick={() => setFailedCards(null)}
+                onClick={() => setFailedCardsVisible(false)}
                 className="p-1 text-orange-400 hover:text-orange-600"
+                title="Hide (list is saved)"
               >
                 <X className="w-4 h-4" />
               </button>
