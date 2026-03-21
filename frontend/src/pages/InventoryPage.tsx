@@ -324,6 +324,58 @@ function InventoryPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [carouselDeck])
 
+  // Poll recent_scans while the carousel is open — fire PullNotification and
+  // stamp PULLED on any card whose QR gets scanned (mirrors the homepage feed).
+  const carouselSeenIds = useRef<Set<number>>(new Set())
+  useEffect(() => {
+    if (!carouselDeck) {
+      carouselSeenIds.current = new Set()
+      return
+    }
+
+    const initialized = { current: false }
+
+    const poll = async () => {
+      try {
+        const res = await apiClient.get('/inventory/recent_scans/?limit=50')
+        const items: InventoryItem[] = res.data
+
+        if (!initialized.current) {
+          // Seed on first load — don't fire notifications for pre-existing sold cards
+          items.forEach(item => carouselSeenIds.current.add(item.id))
+          initialized.current = true
+          return
+        }
+
+        const newItems = items.filter(item => !carouselSeenIds.current.has(item.id))
+        if (newItems.length === 0) return
+        newItems.forEach(item => carouselSeenIds.current.add(item.id))
+
+        // Mark all newly-sold cards that live in this carousel
+        setCarouselCards(prev => {
+          const newIds = new Set(newItems.map(i => i.id))
+          let hit: InventoryItem | undefined
+          const updated = prev.map(item => {
+            if (newIds.has(item.id) && !item.sold_at) {
+              const soldVersion = { ...item, sold_at: new Date().toISOString() }
+              if (!hit) hit = soldVersion
+              return soldVersion
+            }
+            return item
+          })
+          if (hit) setCarouselNotification(hit)
+          return updated
+        })
+      } catch {
+        // silently ignore poll errors
+      }
+    }
+
+    poll() // immediate first tick
+    const interval = setInterval(poll, 3000)
+    return () => clearInterval(interval)
+  }, [carouselDeck])
+
   // Handle CSV file upload for a deck
   const handleCsvUpload = async (deckId: number, file: File) => {
     const deck = decks.find(d => d.id === deckId)
