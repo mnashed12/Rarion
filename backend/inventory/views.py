@@ -971,10 +971,13 @@ class DeckViewSet(viewsets.ModelViewSet):
     def _find_card(self, card_name, card_number, set_name):
         """Find a matching card in the database using multiple strategies."""
         import re
-        
+
+        if not card_name or not card_name.strip():
+            return None
+
         # Clean up the card name (remove parenthetical variations)
         base_name = re.sub(r'\s*\([^)]*\)\s*$', '', card_name).strip()
-        
+
         # Clean up card number
         clean_number = card_number.strip()
         number_match = re.match(r'^0*(\d+)/0*(\d+)$', clean_number)
@@ -982,56 +985,62 @@ class DeckViewSet(viewsets.ModelViewSet):
             normalized_number = f"{number_match.group(1)}/{number_match.group(2)}"
         else:
             normalized_number = clean_number
-        
+
         from django.db.models import Q
-        
-        # Strategy 1: Exact match on name and card number
-        card = Card.objects.filter(
+
+        # Strategy 1: Exact name + exact card number (prefer cards with images)
+        qs = Card.objects.filter(
             Q(name__iexact=card_name) | Q(name__iexact=base_name),
             card_number__iexact=clean_number
-        ).exclude(image__isnull=True).exclude(image='').first()
+        )
+        card = qs.exclude(image__isnull=True).exclude(image='').first() or qs.first()
         if card:
             return card
-        
-        # Strategy 2: Try with normalized card number
-        card = Card.objects.filter(
+
+        # Strategy 2: Exact name + normalized card number
+        qs = Card.objects.filter(
             Q(name__iexact=card_name) | Q(name__iexact=base_name),
             card_number__iexact=normalized_number
-        ).exclude(image__isnull=True).exclude(image='').first()
+        )
+        card = qs.exclude(image__isnull=True).exclude(image='').first() or qs.first()
         if card:
             return card
-        
-        # Strategy 3: Match by card number and set name
-        card = Card.objects.filter(
+
+        # Strategy 3: Card number + set name + partial name match
+        set_word = set_name.split()[0] if set_name.split() else set_name
+        qs = Card.objects.filter(
             Q(card_number__iexact=clean_number) | Q(card_number__iexact=normalized_number),
-            pokemon_set__name__icontains=set_name.split()[0]
+            pokemon_set__name__icontains=set_word
         ).filter(
             Q(name__icontains=base_name.split()[0]) | Q(name__icontains=base_name)
-        ).exclude(image__isnull=True).exclude(image='').first()
+        )
+        card = qs.exclude(image__isnull=True).exclude(image='').first() or qs.first()
         if card:
             return card
-        
-        # Strategy 4: Fuzzy match on name, exact on number
-        card = Card.objects.filter(
+
+        # Strategy 4: Card number + first word of name (fuzzy)
+        qs = Card.objects.filter(
             Q(card_number__iexact=clean_number) | Q(card_number__iexact=normalized_number)
         ).filter(
             name__icontains=base_name.split()[0]
-        ).exclude(image__isnull=True).exclude(image='').first()
+        )
+        card = qs.exclude(image__isnull=True).exclude(image='').first() or qs.first()
         if card:
             return card
-        
-        # Strategy 5: Match name with set (for promos)
+
+        # Strategy 5: Promo sets — match name against any promo set
         if 'promo' in set_name.lower() or len(clean_number) <= 4:
-            card = Card.objects.filter(
+            qs = Card.objects.filter(
                 name__iexact=base_name,
                 pokemon_set__name__icontains='promo'
-            ).exclude(image__isnull=True).exclude(image='').first()
+            )
+            card = qs.exclude(image__isnull=True).exclude(image='').first() or qs.first()
             if card:
                 return card
-        
-        # Strategy 6: Just try to match by name
-        card = Card.objects.filter(
+
+        # Strategy 6: Name-only fallback
+        qs = Card.objects.filter(
             Q(name__iexact=card_name) | Q(name__iexact=base_name)
-        ).exclude(image__isnull=True).exclude(image='').first()
-        
+        )
+        card = qs.exclude(image__isnull=True).exclude(image='').first() or qs.first()
         return card
