@@ -989,6 +989,113 @@ class DeckViewSet(viewsets.ModelViewSet):
             'deck': deck.name,
         })
 
+    @action(detail=True, methods=['post'], parser_classes=[MultiPartParser, FormParser, JSONParser])
+    def add_card_manual(self, request, pk=None):
+        """
+        Manually add a card to a deck. Creates a new Card record if needed.
+        Accepts: name, set_name, card_number, condition, quantity,
+                 purchase_price, current_price, notes, image (file, optional)
+        """
+        from decimal import Decimal, InvalidOperation
+
+        deck = self.get_object()
+        data = request.data
+
+        card_name = data.get('name', '').strip()
+        set_name = data.get('set_name', '').strip()
+        card_number = data.get('card_number', '').strip()
+        condition = data.get('condition', 'near_mint').strip()
+        notes = data.get('notes', '').strip()
+        image_file = request.FILES.get('image')
+
+        def safe_decimal(s):
+            try:
+                return Decimal(str(s).replace('$', '').replace(',', '').strip()) if s else None
+            except (InvalidOperation, Exception):
+                return None
+
+        try:
+            quantity = int(data.get('quantity', 1))
+        except (ValueError, TypeError):
+            quantity = 1
+
+        purchase_price = safe_decimal(data.get('purchase_price'))
+        current_price = safe_decimal(data.get('current_price'))
+
+        if not card_name:
+            return Response({'error': 'Card name is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Try to find existing card first
+        card = self._find_card(card_name, card_number, set_name)
+
+        if not card:
+            # Create a new Card + PokemonSet (or find matching set)
+            pokemon_set = None
+            if set_name:
+                pokemon_set = PokemonSet.objects.filter(name__iexact=set_name).first()
+                if not pokemon_set:
+                    pokemon_set = PokemonSet.objects.create(
+                        name=set_name,
+                        set_code=set_name[:10].upper().replace(' ', '_'),
+                    )
+
+            if not pokemon_set:
+                pokemon_set = PokemonSet.objects.first()
+
+            card = Card.objects.create(
+                name=card_name,
+                card_number=card_number or '0',
+                pokemon_set=pokemon_set,
+            )
+            logger.info(f'[add_card_manual] Created new card: {card_name} #{card_number}')
+
+        # Attach image if provided
+        if image_file and hasattr(card, 'image'):
+            card.image = image_file
+            card.save()
+
+        condition_map = {
+            'mint': 'mint',
+            'near_mint': 'near_mint',
+            'near mint': 'near_mint',
+            'lightly_played': 'lightly_played',
+            'lightly played': 'lightly_played',
+            'moderately_played': 'moderately_played',
+            'moderately played': 'moderately_played',
+            'heavily_played': 'heavily_played',
+            'heavily played': 'heavily_played',
+            'damaged': 'damaged',
+        }
+        condition = condition_map.get(condition.lower(), 'near_mint')
+
+        inventory_item, created = InventoryItem.objects.get_or_create(
+            card=card,
+            condition=condition,
+            deck=deck,
+            defaults={
+                'quantity': quantity,
+                'purchase_price': purchase_price,
+                'current_price': current_price,
+                'notes': notes or 'Added manually',
+            }
+        )
+
+        if not created:
+            inventory_item.quantity += quantity
+            if purchase_price:
+                inventory_item.purchase_price = purchase_price
+            if current_price:
+                inventory_item.current_price = current_price
+            inventory_item.save()
+
+        return Response({
+            'success': True,
+            'created': created,
+            'card_id': card.id,
+            'card_name': card.name,
+            'inventory_id': inventory_item.id,
+        })
+
     def _find_card(self, card_name, card_number, set_name):
         """Find a matching card in the database using multiple strategies."""
         import re

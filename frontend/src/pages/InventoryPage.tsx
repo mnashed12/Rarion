@@ -181,6 +181,11 @@ function InventoryPage() {
   const [uploadingDeckId, setUploadingDeckId] = useState<number | null>(null)
   const [importModal, setImportModal] = useState<{ deckName: string; phase: number } | null>(null)
   const [importResult, setImportResult] = useState<{ imported: number; updated: number; not_found: number; not_found_cards?: string[]; errors?: number; error_details?: string[] } | null>(null)
+  const [failedCards, setFailedCards] = useState<{ deckId: number; deckName: string; cards: string[] } | null>(null)
+  const [manualAddModal, setManualAddModal] = useState<{ deckId: number; deckName: string; prefill?: string } | null>(null)
+  const [manualAddForm, setManualAddForm] = useState({ name: '', set_name: '', card_number: '', condition: 'near_mint', quantity: '1', purchase_price: '', current_price: '', notes: '' })
+  const [manualAddImage, setManualAddImage] = useState<File | null>(null)
+  const [manualAddLoading, setManualAddLoading] = useState(false)
   const [deckModal, setDeckModal] = useState<{ mode: 'create' | 'rename'; deck?: Deck; name: string; background_image: 'PAKMAKDECK' | 'DANNYDECK' } | null>(null)
   const [_deckStats, setDeckStats] = useState<{ total_items: number; total_quantity: number; total_value: number; low_stock: number } | null>(null)
   
@@ -342,6 +347,11 @@ function InventoryPage() {
       // Refresh all deck prestige stats (bars on cards update live)
       await refreshDecks()
       
+      // Persist failed cards so user can add them manually
+      if (result.not_found_cards && result.not_found_cards.length > 0) {
+        setFailedCards({ deckId: deckId, deckName: deck?.name || 'Deck', cards: result.not_found_cards })
+      }
+
       // Auto-close after showing results
       setTimeout(() => {
         setImportModal(null)
@@ -479,6 +489,48 @@ function InventoryPage() {
     } catch (error: any) {
       const errorMsg = error.response?.data?.error || 'Failed to mark as sold'
       setToast({ message: errorMsg, type: 'error' })
+    }
+  }
+
+  // Manually add a card to a deck
+  const handleManualAdd = async () => {
+    if (!manualAddModal) return
+    setManualAddLoading(true)
+    try {
+      const formData = new FormData()
+      formData.append('name', manualAddForm.name)
+      formData.append('set_name', manualAddForm.set_name)
+      formData.append('card_number', manualAddForm.card_number)
+      formData.append('condition', manualAddForm.condition)
+      formData.append('quantity', manualAddForm.quantity)
+      formData.append('purchase_price', manualAddForm.purchase_price)
+      formData.append('current_price', manualAddForm.current_price)
+      formData.append('notes', manualAddForm.notes)
+      if (manualAddImage) formData.append('image', manualAddImage)
+
+      await apiClient.post(`/decks/${manualAddModal.deckId}/add_card_manual/`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+
+      // Remove this card from the failed list if it was there
+      if (failedCards) {
+        const remaining = failedCards.cards.filter(c => !c.toLowerCase().includes(manualAddForm.name.toLowerCase()))
+        setFailedCards(remaining.length > 0 ? { ...failedCards, cards: remaining } : null)
+      }
+
+      setToast({ message: `${manualAddForm.name} added to deck!`, type: 'success' })
+      setManualAddModal(null)
+      setManualAddForm({ name: '', set_name: '', card_number: '', condition: 'near_mint', quantity: '1', purchase_price: '', current_price: '', notes: '' })
+      setManualAddImage(null)
+
+      if (selectedDeck?.id === manualAddModal.deckId) {
+        setPage(1)
+      }
+      await refreshDecks()
+    } catch (error: any) {
+      setToast({ message: error.response?.data?.error || 'Failed to add card', type: 'error' })
+    } finally {
+      setManualAddLoading(false)
     }
   }
 
@@ -958,7 +1010,59 @@ function InventoryPage() {
           ">
             <Download className="w-5 h-5" />
           </button>
+
+          {/* Manual add button */}
+          <button
+            onClick={() => {
+              setManualAddForm({ name: '', set_name: '', card_number: '', condition: 'near_mint', quantity: '1', purchase_price: '', current_price: '', notes: '' })
+              setManualAddImage(null)
+              setManualAddModal({ deckId: selectedDeck.id, deckName: selectedDeck.name })
+            }}
+            className="flex items-center justify-center gap-2 h-12 px-4 rounded-xl border-2 border-gray-100 bg-white text-gray-600 hover:bg-emerald-50 hover:border-emerald-400 hover:text-emerald-600 font-bold transition-all active:scale-[0.98]"
+            title="Add Card Manually"
+          >
+            <Plus className="w-5 h-5" />
+          </button>
         </div>
+
+        {/* Failed imports banner */}
+        {failedCards && failedCards.deckId === selectedDeck.id && (
+          <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1">
+                <p className="text-orange-700 font-bold text-sm mb-2">
+                  ⚠ {failedCards.cards.length} card{failedCards.cards.length !== 1 ? 's' : ''} not found in the database — add them manually:
+                </p>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {failedCards.cards.map((card, i) => {
+                    const namePart = card.split(' (')[0]
+                    return (
+                      <div key={i} className="flex items-center justify-between gap-2">
+                        <span className="text-orange-600 text-xs font-mono truncate flex-1">{card}</span>
+                        <button
+                          onClick={() => {
+                            setManualAddForm({ name: namePart, set_name: '', card_number: '', condition: 'near_mint', quantity: '1', purchase_price: '', current_price: '', notes: '' })
+                            setManualAddImage(null)
+                            setManualAddModal({ deckId: selectedDeck.id, deckName: selectedDeck.name, prefill: card })
+                          }}
+                          className="flex-shrink-0 px-2 py-0.5 text-xs font-bold bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+              <button
+                onClick={() => setFailedCards(null)}
+                className="p-1 text-orange-400 hover:text-orange-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Filters Panel */}
         <div className={`
@@ -1673,6 +1777,187 @@ function InventoryPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Manual Add Card Modal */}
+      {manualAddModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center animate-fade-in">
+          <div className="bg-white rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="text-xl font-black text-gray-900">Add Card Manually</h3>
+                <p className="text-sm text-gray-500 mt-0.5">{manualAddModal.deckName}</p>
+              </div>
+              <button
+                onClick={() => setManualAddModal(null)}
+                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Card Name */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Card Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={manualAddForm.name}
+                  onChange={e => setManualAddForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder="e.g. Charizard"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                />
+              </div>
+
+              {/* Set & Card Number */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Set Name</label>
+                  <input
+                    type="text"
+                    value={manualAddForm.set_name}
+                    onChange={e => setManualAddForm(f => ({ ...f, set_name: e.target.value }))}
+                    placeholder="e.g. Base Set"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Card Number</label>
+                  <input
+                    type="text"
+                    value={manualAddForm.card_number}
+                    onChange={e => setManualAddForm(f => ({ ...f, card_number: e.target.value }))}
+                    placeholder="e.g. 4/102"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+              </div>
+
+              {/* Condition & Quantity */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Condition</label>
+                  <select
+                    value={manualAddForm.condition}
+                    onChange={e => setManualAddForm(f => ({ ...f, condition: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  >
+                    <option value="near_mint">Near Mint</option>
+                    <option value="lightly_played">Lightly Played</option>
+                    <option value="moderately_played">Moderately Played</option>
+                    <option value="heavily_played">Heavily Played</option>
+                    <option value="damaged">Damaged</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Quantity</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={manualAddForm.quantity}
+                    onChange={e => setManualAddForm(f => ({ ...f, quantity: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+              </div>
+
+              {/* Prices */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Purchase Price ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={manualAddForm.purchase_price}
+                    onChange={e => setManualAddForm(f => ({ ...f, purchase_price: e.target.value }))}
+                    placeholder="0.00"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Current Price ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={manualAddForm.current_price}
+                    onChange={e => setManualAddForm(f => ({ ...f, current_price: e.target.value }))}
+                    placeholder="0.00"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Notes</label>
+                <textarea
+                  value={manualAddForm.notes}
+                  onChange={e => setManualAddForm(f => ({ ...f, notes: e.target.value }))}
+                  placeholder="Optional notes..."
+                  rows={2}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
+                />
+              </div>
+
+              {/* Image Upload */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Card Image (optional)</label>
+                <label className="flex items-center gap-3 cursor-pointer border-2 border-dashed border-gray-300 rounded-lg px-4 py-3 hover:border-orange-400 transition-colors group">
+                  <Upload className="w-5 h-5 text-gray-400 group-hover:text-orange-400 flex-shrink-0" />
+                  <span className="text-sm text-gray-500 group-hover:text-orange-500 truncate">
+                    {manualAddImage ? manualAddImage.name : 'Click to upload image'}
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={e => setManualAddImage(e.target.files?.[0] ?? null)}
+                  />
+                </label>
+                {manualAddImage && (
+                  <button
+                    onClick={() => setManualAddImage(null)}
+                    className="mt-1 text-xs text-red-500 hover:underline"
+                  >
+                    Remove image
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setManualAddModal(null)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleManualAdd}
+                disabled={!manualAddForm.name.trim() || manualAddLoading}
+                className="flex-1 px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+              >
+                {manualAddLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" />
+                    Add to Deck
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
