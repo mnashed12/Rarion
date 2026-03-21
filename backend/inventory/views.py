@@ -816,7 +816,7 @@ class DeckViewSet(viewsets.ModelViewSet):
         clear_deck = request.data.get('clear', 'false').lower() == 'true'
 
         try:
-            decoded_file = csv_file.read().decode('utf-8')
+            decoded_file = csv_file.read().decode('utf-8-sig')  # handles BOM
             reader = csv.DictReader(io.StringIO(decoded_file))
         except Exception as e:
             logger.error(f'[import_csv] Failed to read CSV: {e}')
@@ -870,6 +870,7 @@ class DeckViewSet(viewsets.ModelViewSet):
         not_found = 0
         errors = 0
         not_found_cards = []
+        error_details = []
 
         for row in rows:
             try:
@@ -952,6 +953,8 @@ class DeckViewSet(viewsets.ModelViewSet):
 
             except Exception as e:
                 errors += 1
+                msg = f'{type(e).__name__}: {e}'
+                error_details.append(msg)
                 logger.error(f'[import_csv] Error on row {row}: {e}')
 
         logger.info(f'[import_csv] Done: imported={imported} updated={updated} not_found={not_found} errors={errors}')
@@ -964,6 +967,7 @@ class DeckViewSet(viewsets.ModelViewSet):
             'updated': updated,
             'not_found': not_found,
             'errors': errors,
+            'error_details': error_details[:10],
             'not_found_cards': not_found_cards[:20],
             'deck': deck.name,
         })

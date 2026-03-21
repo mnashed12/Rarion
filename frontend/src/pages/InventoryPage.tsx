@@ -180,7 +180,7 @@ function InventoryPage() {
   const [carouselNotification, setCarouselNotification] = useState<InventoryItem | null>(null)
   const [uploadingDeckId, setUploadingDeckId] = useState<number | null>(null)
   const [importModal, setImportModal] = useState<{ deckName: string; phase: number } | null>(null)
-  const [importResult, setImportResult] = useState<{ imported: number; updated: number; not_found: number; not_found_cards?: string[] } | null>(null)
+  const [importResult, setImportResult] = useState<{ imported: number; updated: number; not_found: number; not_found_cards?: string[]; errors?: number; error_details?: string[] } | null>(null)
   const [deckModal, setDeckModal] = useState<{ mode: 'create' | 'rename'; deck?: Deck; name: string; background_image: 'PAKMAKDECK' | 'DANNYDECK' } | null>(null)
   const [_deckStats, setDeckStats] = useState<{ total_items: number; total_quantity: number; total_value: number; low_stock: number } | null>(null)
   
@@ -1629,6 +1629,14 @@ function InventoryPage() {
                     <p className="text-orange-300 text-xs font-bold mb-1 uppercase tracking-wide">Unmatched cards:</p>
                     {importResult.not_found_cards.map((c: string, i: number) => (
                       <p key={i} className="text-orange-200/70 text-[10px] font-mono truncate">{c}</p>
+                    ))}
+                  </div>
+                )}
+                {(importResult.errors ?? 0) > 0 && (
+                  <div className="bg-red-500/20 rounded-xl p-3 border border-red-500/30">
+                    <p className="text-red-300 text-xs font-bold mb-1 uppercase tracking-wide">Errors: {importResult.errors}</p>
+                    {importResult.error_details && importResult.error_details.map((e: string, i: number) => (
+                      <p key={i} className="text-red-200/70 text-[10px] font-mono truncate">{e}</p>
                     ))}
                   </div>
                 )}
