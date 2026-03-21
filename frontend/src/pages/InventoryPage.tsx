@@ -188,7 +188,7 @@ function InventoryPage() {
       return stored ? JSON.parse(stored) : null
     } catch { return null }
   })
-  const [failedCardsVisible, setFailedCardsVisible] = useState(true)
+
   const [manualAddModal, setManualAddModal] = useState<{ deckId: number; deckName: string; prefill?: string } | null>(null)
   const [manualAddForm, setManualAddForm] = useState({ name: '', set_name: '', card_number: '', condition: 'near_mint', quantity: '1', purchase_price: '', current_price: '', notes: '' })
   const [manualAddImage, setManualAddImage] = useState<File | null>(null)
@@ -366,7 +366,7 @@ function InventoryPage() {
       // Persist failed cards so user can add them manually
       if (result.not_found_cards && result.not_found_cards.length > 0) {
         setFailedCards({ deckId: deckId, deckName: deck?.name || 'Deck', cards: result.not_found_cards })
-        setFailedCardsVisible(true)
+
       }
 
       // Auto-close after showing results
@@ -1073,65 +1073,45 @@ function InventoryPage() {
             <Plus className="w-5 h-5" />
           </button>
 
-          {/* Failed cards re-open button — only visible when banner is hidden */}
-          {failedCards && failedCards.deckId === selectedDeck.id && !failedCardsVisible && (
-            <button
-              onClick={() => setFailedCardsVisible(true)}
-              className="relative flex items-center justify-center h-12 px-4 rounded-xl border-2 border-orange-300 bg-orange-50 text-orange-600 hover:bg-orange-100 font-bold transition-all active:scale-[0.98]"
-              title="Show unmatched cards"
-            >
+          {failedCards && failedCards.deckId === selectedDeck.id && (
+            <div className="relative flex items-center justify-center h-12 px-4 rounded-xl border-2 border-orange-300 bg-orange-50 text-orange-600 font-bold">
               <AlertTriangle className="w-5 h-5" />
               <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-orange-500 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1">
                 {failedCards.cards.length}
               </span>
-            </button>
+            </div>
           )}
         </div>
 
-        {/* Failed imports banner */}
-        {failedCards && failedCards.deckId === selectedDeck.id && failedCardsVisible && (
+        {/* Failed imports banner — stays until all cards are manually added */}
+        {failedCards && failedCards.deckId === selectedDeck.id && (
           <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 mb-2 flex-wrap">
-                  <p className="text-orange-700 font-bold text-sm">
-                    ⚠ {failedCards.cards.length} card{failedCards.cards.length !== 1 ? 's' : ''} not found in the database — add them manually:
-                  </p>
-                  <button
-                    onClick={() => setFailedCards(null)}
-                    className="text-xs text-red-500 hover:text-red-700 font-semibold underline flex-shrink-0"
-                  >
-                    Clear all
-                  </button>
-                </div>
-                <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
-                  {failedCards.cards.map((card, i) => {
-                    const namePart = card.split(' (')[0]
-                    return (
-                      <div key={i} className="flex items-center justify-between gap-2">
-                        <span className="text-orange-600 text-xs font-mono truncate flex-1">{card}</span>
-                        <button
-                          onClick={() => {
-                            setManualAddForm({ name: namePart, set_name: '', card_number: '', condition: 'near_mint', quantity: '1', purchase_price: '', current_price: '', notes: '' })
-                            setManualAddImage(null)
-                            setManualAddModal({ deckId: selectedDeck.id, deckName: selectedDeck.name, prefill: card })
-                          }}
-                          className="flex-shrink-0 px-2 py-0.5 text-xs font-bold bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
-                        >
-                          Add
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-              <button
-                onClick={() => setFailedCardsVisible(false)}
-                className="p-1 text-orange-400 hover:text-orange-600 flex-shrink-0"
-                title="Hide (list is saved — use the ⚠ button to reopen)"
-              >
-                <X className="w-4 h-4" />
-              </button>
+            <p className="text-orange-700 font-bold text-sm mb-2">
+              ⚠ {failedCards.cards.length} card{failedCards.cards.length !== 1 ? 's' : ''} not found in the database — add them manually:
+            </p>
+            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              {failedCards.cards.map((card, i) => {
+                // Format: "Card Name (number) - Set Name"
+                const nameMatch = card.match(/^(.+?)\s*\(([^)]+)\)\s*-\s*(.+)$/)
+                const namePart    = nameMatch ? nameMatch[1].trim() : card.split(' (')[0]
+                const numberPart  = nameMatch ? nameMatch[2].trim() : ''
+                const setPart     = nameMatch ? nameMatch[3].trim() : ''
+                return (
+                  <div key={i} className="flex items-center gap-3">
+                    <span className="text-orange-600 text-xs font-mono truncate flex-1">{card}</span>
+                    <button
+                      onClick={() => {
+                        setManualAddForm({ name: namePart, set_name: setPart, card_number: numberPart, condition: 'near_mint', quantity: '1', purchase_price: '', current_price: '', notes: '' })
+                        setManualAddImage(null)
+                        setManualAddModal({ deckId: selectedDeck.id, deckName: selectedDeck.name, prefill: card })
+                      }}
+                      className="flex-shrink-0 px-4 py-1.5 text-sm font-bold bg-orange-500 text-white rounded-lg hover:bg-orange-600 active:scale-95 transition-all"
+                    >
+                      Add
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}
