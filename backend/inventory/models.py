@@ -205,6 +205,12 @@ class InventoryItem(models.Model):
         blank=True,
         help_text="Additional notes about this inventory item"
     )
+    grade = models.CharField(
+        max_length=50,
+        blank=True,
+        default='',
+        help_text="Card grade (e.g. PSA 10, BGS 9.5, or blank if ungraded)"
+    )
     sku = models.CharField(
         max_length=50,
         unique=True,
