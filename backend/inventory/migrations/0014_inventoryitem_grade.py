@@ -2,13 +2,21 @@ from django.db import migrations, models
 
 
 def add_columns_if_missing(apps, schema_editor):
-    """Safely add grade, variance, rarity columns only if they don't already exist."""
-    with schema_editor.connection.cursor() as cursor:
-        cursor.execute("""
-            SELECT column_name FROM information_schema.columns
-            WHERE table_name = 'inventory_items'
-        """)
-        columns = [row[0] for row in cursor.fetchall()]
+    """Safely add grade, variance, rarity columns — works on both SQLite and PostgreSQL."""
+    connection = schema_editor.connection
+    vendor = connection.vendor  # 'sqlite' or 'postgresql'
+
+    with connection.cursor() as cursor:
+        if vendor == 'sqlite':
+            cursor.execute("PRAGMA table_info(inventory_items)")
+            columns = [row[1] for row in cursor.fetchall()]
+        else:
+            cursor.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'inventory_items'
+            """)
+            columns = [row[0] for row in cursor.fetchall()]
+
         if 'grade' not in columns:
             cursor.execute(
                 "ALTER TABLE inventory_items ADD COLUMN grade VARCHAR(50) NOT NULL DEFAULT ''"
@@ -58,4 +66,5 @@ class Migration(migrations.Migration):
             ]
         ),
     ]
+
 
