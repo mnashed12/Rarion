@@ -362,12 +362,34 @@ function InventoryPage() {
       clearInterval(messageInterval)
       console.error('[CSV Import] Error:', error)
       console.error('[CSV Import] Response data:', error.response?.data)
-      setImportModal(null)
-      setUploadingDeckId(null)
-      setToast({ 
-        message: error.response?.data?.error || 'Failed to import CSV', 
-        type: 'error' 
-      })
+
+      const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout')
+
+      // Keep the modal open to show the timeout state instead of silently dismissing
+      if (isTimeout) {
+        setImportResult({
+          imported: 0,
+          updated: 0,
+          not_found: 0,
+          errors: 0,
+          error_details: [],
+          not_found_cards: [],
+          _timed_out: true,
+        } as any)
+        // Auto-close after displaying the message
+        setTimeout(() => {
+          setImportModal(null)
+          setImportResult(null)
+          setUploadingDeckId(null)
+        }, 5000)
+      } else {
+        setImportModal(null)
+        setUploadingDeckId(null)
+        setToast({
+          message: error.response?.data?.error || 'Failed to import CSV',
+          type: 'error',
+        })
+      }
     }
   }
 
@@ -873,14 +895,24 @@ function InventoryPage() {
                       </button>
                     </div>
  
-                    {/* Deck name */}
-                    <div className="relative z-10 text-center flex-1 flex items-center">
+                    {/* Deck name + card count */}
+                    <div className="relative z-10 text-center flex-1 flex items-center justify-center flex-col gap-1">
                       <h3 className={`
                         font-black text-sm leading-tight
                         ${selectedDeck?.id === deck.id ? 'text-white' : 'text-gray-800'}
                       `}>
                         {deck.name}
                       </h3>
+                      {(deck.prestige_stats?.total ?? 0) > 0 && (
+                        <span className={`
+                          text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums
+                          ${selectedDeck?.id === deck.id
+                            ? 'bg-white/20 text-white'
+                            : 'bg-gray-200 text-gray-500'}
+                        `}>
+                          {deck.prestige_stats!.total} cards
+                        </span>
+                      )}
                     </div>
 
                     {/* Prestige Pull Rate Bars */}
@@ -1703,7 +1735,11 @@ function InventoryPage() {
 
             {/* Title */}
             <h3 className="text-2xl font-black text-white text-center mb-2">
-              {importResult ? 'Import Complete!' : 'Importing Cards...'}
+              {(importResult as any)?._timed_out
+                ? 'Import Timed Out'
+                : importResult
+                  ? 'Import Complete!'
+                  : 'Importing Cards...'}
             </h3>
             
             {/* Deck name */}
@@ -1712,42 +1748,53 @@ function InventoryPage() {
             </p>
 
             {importResult ? (
-              /* Results */
-              <div className="space-y-3">
-                <div className="flex items-center justify-between bg-emerald-500/20 rounded-xl p-3 border border-emerald-500/30">
-                  <span className="text-emerald-300">Cards Imported</span>
-                  <span className="text-2xl font-black text-emerald-400">{importResult.imported}</span>
+              (importResult as any)._timed_out ? (
+                /* Timeout state */
+                <div className="space-y-3">
+                  <div className="bg-yellow-500/20 rounded-xl p-4 border border-yellow-500/30 text-center">
+                    <p className="text-yellow-300 font-bold mb-2">The server took too long to respond.</p>
+                    <p className="text-yellow-200/80 text-sm">Your CSV may still be processing on the server. Wait a minute then refresh the page to see if cards were imported.</p>
+                  </div>
+                  <p className="text-center text-gray-400 text-sm animate-pulse">Closing automatically...</p>
                 </div>
-                <div className="flex items-center justify-between bg-blue-500/20 rounded-xl p-3 border border-blue-500/30">
-                  <span className="text-blue-300">Cards Updated</span>
-                  <span className="text-2xl font-black text-blue-400">{importResult.updated}</span>
+              ) : (
+                /* Normal results */
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between bg-emerald-500/20 rounded-xl p-3 border border-emerald-500/30">
+                    <span className="text-emerald-300">Cards Imported</span>
+                    <span className="text-2xl font-black text-emerald-400">{importResult.imported}</span>
+                  </div>
+                  <div className="flex items-center justify-between bg-blue-500/20 rounded-xl p-3 border border-blue-500/30">
+                    <span className="text-blue-300">Cards Updated</span>
+                    <span className="text-2xl font-black text-blue-400">{importResult.updated}</span>
+                  </div>
+                  {importResult.not_found > 0 && (
+                    <div className="flex items-center justify-between bg-orange-500/20 rounded-xl p-3 border border-orange-500/30">
+                      <span className="text-orange-300">Not Found</span>
+                      <span className="text-2xl font-black text-orange-400">{importResult.not_found}</span>
+                    </div>
+                  )}
+                  {importResult.not_found_cards && importResult.not_found_cards.length > 0 && (
+                    <div className="bg-orange-500/10 rounded-xl p-3 border border-orange-500/20 max-h-32 overflow-y-auto">
+                      <p className="text-orange-300 text-xs font-bold mb-1 uppercase tracking-wide">Unmatched cards:</p>
+                      {importResult.not_found_cards.map((c: string, i: number) => (
+                        <p key={i} className="text-orange-200/70 text-[10px] font-mono truncate">{c}</p>
+                      ))}
+                    </div>
+                  )}
+                  {(importResult.errors ?? 0) > 0 && (
+                    <div className="bg-red-500/20 rounded-xl p-3 border border-red-500/30">
+                      <p className="text-red-300 text-xs font-bold mb-1 uppercase tracking-wide">Errors: {importResult.errors}</p>
+                      {importResult.error_details && importResult.error_details.map((e: string, i: number) => (
+                        <p key={i} className="text-red-200/70 text-[10px] font-mono truncate">{e}</p>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-center text-gray-400 text-sm mt-4 animate-pulse">
+                    Closing automatically...
+                  </p>
                 </div>
-                {importResult.not_found > 0 && (
-                  <div className="flex items-center justify-between bg-orange-500/20 rounded-xl p-3 border border-orange-500/30">
-                    <span className="text-orange-300">Not Found</span>
-                    <span className="text-2xl font-black text-orange-400">{importResult.not_found}</span>
-                  </div>
-                )}
-                {importResult.not_found_cards && importResult.not_found_cards.length > 0 && (
-                  <div className="bg-orange-500/10 rounded-xl p-3 border border-orange-500/20 max-h-32 overflow-y-auto">
-                    <p className="text-orange-300 text-xs font-bold mb-1 uppercase tracking-wide">Unmatched cards:</p>
-                    {importResult.not_found_cards.map((c: string, i: number) => (
-                      <p key={i} className="text-orange-200/70 text-[10px] font-mono truncate">{c}</p>
-                    ))}
-                  </div>
-                )}
-                {(importResult.errors ?? 0) > 0 && (
-                  <div className="bg-red-500/20 rounded-xl p-3 border border-red-500/30">
-                    <p className="text-red-300 text-xs font-bold mb-1 uppercase tracking-wide">Errors: {importResult.errors}</p>
-                    {importResult.error_details && importResult.error_details.map((e: string, i: number) => (
-                      <p key={i} className="text-red-200/70 text-[10px] font-mono truncate">{e}</p>
-                    ))}
-                  </div>
-                )}
-                <p className="text-center text-gray-400 text-sm mt-4 animate-pulse">
-                  Closing automatically...
-                </p>
-              </div>
+              )
             ) : (
               /* Loading message */
               <div className="text-center">

@@ -865,6 +865,105 @@ class DeckViewSet(viewsets.ModelViewSet):
             except (ValueError, TypeError):
                 return default
 
+        # ------------------------------------------------------------------
+        # Pre-load ALL cards into memory so we do ONE bulk query instead of
+        # N×12 individual queries (one per strategy per row).  For a 500-row
+        # CSV this reduces ~6 000 DB round-trips to a single SELECT, cutting
+        # runtime from minutes to seconds.
+        # ------------------------------------------------------------------
+        import re as _re
+
+        _all_cards = list(
+            Card.objects.select_related('pokemon_set').only(
+                'id', 'name', 'card_number', 'image', 'pokemon_set__name'
+            )
+        )
+
+        def _mk(s):
+            return (s or '').lower().strip()
+
+        def _has_img(c):
+            return bool(c.image and c.image != '')
+
+        def _best(cards):
+            if not cards:
+                return None
+            with_img = [c for c in cards if _has_img(c)]
+            return (with_img or cards)[0]
+
+        def _normalize_num(num):
+            m = _re.match(r'^0*(\d+)/0*(\d+)$', num)
+            return f"{m.group(1)}/{m.group(2)}" if m else num
+
+        _by_name_num = {}   # (name_lower, number_lower) -> [card]
+        _by_num      = {}   # number_lower -> [card]
+        _by_name     = {}   # name_lower   -> [card]
+
+        for _c in _all_cards:
+            _nl  = _mk(_c.name)
+            _num = _mk(_c.card_number)
+            _by_name.setdefault(_nl, []).append(_c)
+            _by_num.setdefault(_num, []).append(_c)
+            _by_name_num.setdefault((_nl, _num), []).append(_c)
+
+        def find_card_fast(card_name, card_number, set_name):
+            if not card_name or not card_name.strip():
+                return None
+            base_name = _re.sub(r'\s*\([^)]*\)\s*$', '', card_name).strip()
+            clean_num = _mk(card_number) if card_number else ''
+            norm_num  = _mk(_normalize_num(card_number.strip())) if card_number and card_number.strip() else ''
+            name_low  = _mk(card_name)
+            base_low  = _mk(base_name)
+            set_low   = _mk(set_name)
+            set_parts = set_low.split()
+            set_word  = set_parts[0] if set_parts else ''
+
+            # Strategy 1 & 2: exact name + exact/normalised number
+            for num_key in dict.fromkeys([clean_num, norm_num]):  # dedup, keep order
+                for nk in dict.fromkeys([name_low, base_low]):
+                    cards = _by_name_num.get((nk, num_key), [])
+                    if cards:
+                        return _best(cards)
+
+            # Strategy 3: number + set word + first word of name
+            for num_key in dict.fromkeys([clean_num, norm_num]):
+                first_word = base_low.split()[0] if base_low.split() else ''
+                candidates = _by_num.get(num_key, [])
+                filtered = [
+                    c for c in candidates
+                    if (not set_word or set_word in _mk(c.pokemon_set.name))
+                    and (not first_word or first_word in c.name.lower())
+                ]
+                if filtered:
+                    return _best(filtered)
+
+            # Strategy 4: number + first word of name (no set filter)
+            for num_key in dict.fromkeys([clean_num, norm_num]):
+                first_word = base_low.split()[0] if base_low.split() else ''
+                filtered = [
+                    c for c in _by_num.get(num_key, [])
+                    if first_word and first_word in c.name.lower()
+                ]
+                if filtered:
+                    return _best(filtered)
+
+            # Strategy 5: promo sets
+            if 'promo' in set_low or len(clean_num) <= 4:
+                filtered = [
+                    c for c in _by_name.get(base_low, [])
+                    if 'promo' in _mk(c.pokemon_set.name)
+                ]
+                if filtered:
+                    return _best(filtered)
+
+            # Strategy 6: name-only fallback
+            for nk in dict.fromkeys([name_low, base_low]):
+                cards = _by_name.get(nk, [])
+                if cards:
+                    return _best(cards)
+            return None
+        # ------------------------------------------------------------------
+
         imported = 0
         updated = 0
         not_found = 0
@@ -932,7 +1031,7 @@ class DeckViewSet(viewsets.ModelViewSet):
                     note_parts.append(notes_csv)
                 notes_str = ' | '.join(note_parts)
 
-                card = self._find_card(card_name, card_number, set_name)
+                card = find_card_fast(card_name, card_number, set_name)
 
                 if not card:
                     not_found += 1
