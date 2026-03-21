@@ -20,13 +20,14 @@ class DeckSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'owner', 'created_at', 'updated_at']
 
     def get_prestige_stats(self, obj):
-        from django.db.models import Count
+        from django.db.models import Count, Sum
         items = obj.inventory_items.filter(sold_at__isnull=True)
-        total = items.count()
+        # total = sum of all quantities (how many physical cards), not item count
+        total_agg = items.aggregate(total=Sum('quantity'))['total'] or 0
         counts = items.values('prestige').annotate(count=Count('id'))
         prestige_counts = {c['prestige']: c['count'] for c in counts}
         return {
-            'total': total,
+            'total': total_agg,
             'star': prestige_counts.get('star', 0),
             'galaxy': prestige_counts.get('galaxy', 0),
             'cosmos': prestige_counts.get('cosmos', 0),

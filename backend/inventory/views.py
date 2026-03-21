@@ -831,16 +831,6 @@ class DeckViewSet(viewsets.ModelViewSet):
         if clear_deck:
             InventoryItem.objects.filter(deck=deck).delete()
 
-        # ------------------------------------------------------------------
-        # Pre-load existing InventoryItems so we can decide create vs update
-        # without any per-row DB calls.
-        # Key: (card_id, condition) → item
-        # ------------------------------------------------------------------
-        existing_by_key: dict = {}
-        if not clear_deck:
-            for _item in InventoryItem.objects.filter(deck=deck).select_related('card'):
-                existing_by_key[(_item.card_id, _item.condition)] = _item
-
         condition_map = {
             'mint': 'mint',
             'near mint': 'near_mint',
@@ -996,33 +986,32 @@ class DeckViewSet(viewsets.ModelViewSet):
         # ------------------------------------------------------------------
 
         imported = 0
-        updated = 0
         not_found = 0
         errors = 0
         not_found_cards = []
         error_details = []
         to_create: list = []
-        to_update: list = []
 
         for row in rows:
             try:
                 if is_export_format:
-                    card_name     = row.get('Product Name', '').strip('"').strip()
-                    card_number   = row.get('Card Number', '').strip('"').strip()
-                    set_name      = row.get('Set', '').strip('"').strip()
-                    condition_str = row.get('Card Condition', 'near mint').strip('"').strip().lower()
-                    quantity      = safe_int(row.get('Quantity', 1))
-                    variation     = row.get('Variance', '').strip('"').strip()
-                    rarity        = row.get('Rarity', '').strip('"').strip()
-                    grade         = row.get('Grade', '').strip('"').strip()
-                    notes_csv     = row.get('Notes', '').strip('"').strip()
-                    market_price  = safe_decimal(row.get(market_price_col, ''))
+                    card_name      = row.get('Product Name', '').strip('"').strip()
+                    card_number    = row.get('Card Number', '').strip('"').strip()
+                    set_name       = row.get('Set', '').strip('"').strip()
+                    condition_str  = row.get('Card Condition', 'near mint').strip('"').strip().lower()
+                    quantity       = safe_int(row.get('Quantity', 1))
+                    variation      = row.get('Variance', '').strip('"').strip()
+                    rarity         = row.get('Rarity', '').strip('"').strip()
+                    grade          = row.get('Grade', '').strip('"').strip()
+                    notes_csv      = row.get('Notes', '').strip('"').strip()
+                    market_price   = safe_decimal(row.get(market_price_col, ''))
                     purchase_price = safe_decimal(row.get('Average Cost Paid', ''))
                     price_override = safe_decimal(row.get('Price Override', ''))
-                    watchlist_str = row.get('Watchlist', 'false').strip('"').strip().lower()
-                    watchlist     = watchlist_str == 'true'
-                    date_str      = row.get('Date Added', '').strip('"').strip()
-                    date_added    = None
+                    watchlist_str  = row.get('Watchlist', 'false').strip('"').strip().lower()
+                    watchlist      = watchlist_str == 'true'
+                    portfolio_name = row.get('Portfolio Name', '').strip('"').strip()
+                    date_str       = row.get('Date Added', '').strip('"').strip()
+                    date_added     = None
                     if date_str:
                         try:
                             from datetime import date
@@ -1033,19 +1022,20 @@ class DeckViewSet(viewsets.ModelViewSet):
                     if price_override and price_override > 0:
                         market_price = price_override
                 else:
-                    card_name     = row.get('Card Name', '').strip('"').strip()
-                    card_number   = row.get('Number', '').strip('"').strip()
-                    set_name      = row.get('Set', '').strip('"').strip()
-                    condition_str = row.get('Condition', 'near mint').strip('"').strip().lower()
-                    quantity      = safe_int(row.get('Quantity', 1))
-                    variation     = row.get('Variation', '').strip('"').strip()
-                    rarity        = ''
-                    grade         = ''
-                    notes_csv     = ''
-                    market_price  = safe_decimal(row.get('Market Price', ''))
+                    card_name      = row.get('Card Name', '').strip('"').strip()
+                    card_number    = row.get('Number', '').strip('"').strip()
+                    set_name       = row.get('Set', '').strip('"').strip()
+                    condition_str  = row.get('Condition', 'near mint').strip('"').strip().lower()
+                    quantity       = safe_int(row.get('Quantity', 1))
+                    variation      = row.get('Variation', '').strip('"').strip()
+                    rarity         = ''
+                    grade          = ''
+                    notes_csv      = ''
+                    market_price   = safe_decimal(row.get('Market Price', ''))
                     purchase_price = safe_decimal(row.get('Acquisition Price', ''))
-                    watchlist     = False
-                    date_added    = None
+                    watchlist      = False
+                    portfolio_name = ''
+                    date_added     = None
 
                 if not card_name:
                     continue
@@ -1072,37 +1062,24 @@ class DeckViewSet(viewsets.ModelViewSet):
                     logger.warning(f'[import_csv] Not found: "{card_name}" #{card_number} set="{set_name}"')
                     continue
 
-                key = (card.id, condition)
-                existing = existing_by_key.get(key)
-                if existing:
-                    existing.quantity += quantity
-                    if purchase_price:
-                        existing.purchase_price = purchase_price
-                    if market_price:
-                        existing.current_price = market_price
-                    to_update.append(existing)
-                    updated += 1
-                else:
-                    new_item = InventoryItem(
-                        card=card,
-                        condition=condition,
-                        deck=deck,
-                        quantity=quantity,
-                        purchase_price=purchase_price,
-                        current_price=market_price,
-                        notes=notes_str,
-                        grade='' if grade.lower() == 'ungraded' else grade,
-                        variance=variation,
-                        rarity=rarity,
-                        watchlist=watchlist,
-                        date_added=date_added,
-                    )
-                    new_item.sku = new_item._generate_sku()
-                    # Track in existing_by_key so duplicate rows in the same
-                    # CSV don't create two items for the same (card, condition)
-                    existing_by_key[key] = new_item
-                    to_create.append(new_item)
-                    imported += 1
+                new_item = InventoryItem(
+                    card=card,
+                    condition=condition,
+                    deck=deck,
+                    quantity=quantity,
+                    purchase_price=purchase_price,
+                    current_price=market_price,
+                    notes=notes_str,
+                    grade='' if grade.lower() == 'ungraded' else grade,
+                    variance=variation,
+                    rarity=rarity,
+                    watchlist=watchlist,
+                    date_added=date_added,
+                    location=portfolio_name,
+                )
+                new_item.sku = new_item._generate_sku()
+                to_create.append(new_item)
+                imported += 1
 
             except Exception as e:
                 errors += 1
@@ -1118,26 +1095,18 @@ class DeckViewSet(viewsets.ModelViewSet):
             if to_create:
                 InventoryItem.objects.bulk_create(to_create, batch_size=500)
                 logger.info(f'[import_csv] bulk_create {len(to_create)} items')
-            if to_update:
-                InventoryItem.objects.bulk_update(
-                    to_update,
-                    ['quantity', 'purchase_price', 'current_price'],
-                    batch_size=500,
-                )
-                logger.info(f'[import_csv] bulk_update {len(to_update)} items')
 
-        logger.info(f'[import_csv] Done: imported={imported} updated={updated} not_found={not_found} errors={errors}')
+        logger.info(f'[import_csv] Done: imported={imported} not_found={not_found} errors={errors}')
         if not_found_cards:
             logger.warning(f'[import_csv] Not found (first 20): {not_found_cards[:20]}')
 
         return Response({
             'success': True,
             'imported': imported,
-            'updated': updated,
             'not_found': not_found,
             'errors': errors,
             'error_details': error_details[:10],
-            'not_found_cards': not_found_cards,   # all of them, not first 20
+            'not_found_cards': not_found_cards,
             'deck': deck.name,
         })
 

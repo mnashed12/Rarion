@@ -269,8 +269,6 @@ class InventoryItem(models.Model):
         ordering = ['-created_at']
         verbose_name = 'Inventory Item'
         verbose_name_plural = 'Inventory Items'
-        # Each card + condition + deck combination should be unique
-        unique_together = ['card', 'condition', 'deck']
         indexes = [
             models.Index(fields=['sku'], name='inventory_sku_idx'),
             models.Index(fields=['condition'], name='inventory_condition_idx'),
