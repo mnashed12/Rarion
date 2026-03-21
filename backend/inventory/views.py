@@ -937,7 +937,9 @@ class DeckViewSet(viewsets.ModelViewSet):
                         'purchase_price': purchase_price,
                         'current_price': market_price,
                         'notes': notes_str,
-                        'grade': grade if grade.lower() != 'ungraded' else '',
+                        'grade': '' if grade.lower() == 'ungraded' else grade,
+                        'variance': variation,
+                        'rarity': rarity,
                     }
                 )
 

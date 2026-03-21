@@ -211,6 +211,18 @@ class InventoryItem(models.Model):
         default='',
         help_text="Card grade (e.g. PSA 10, BGS 9.5, or blank if ungraded)"
     )
+    variance = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text="Card variance/variation (e.g. Holofoil, Reverse Holofoil)"
+    )
+    rarity = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text="Card rarity (e.g. Rare, Ultra Rare, Promo)"
+    )
     sku = models.CharField(
         max_length=50,
         unique=True,
