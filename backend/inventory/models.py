@@ -275,7 +275,7 @@ class InventoryItem(models.Model):
         short_uuid = uuid.uuid4().hex[:8].upper()
         
         # Build SKU
-        set_code = self.card.pokemon_set.set_code.upper()
+        set_code = (self.card.pokemon_set.set_code or 'UNK').upper()
         card_num = self.card.card_number.replace('/', '-')
         
         return f"{set_code}-{card_num}-{condition_abbr}-{short_uuid}"
