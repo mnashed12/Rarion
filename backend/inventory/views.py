@@ -887,6 +887,16 @@ class DeckViewSet(viewsets.ModelViewSet):
                     market_price  = safe_decimal(row.get(market_price_col, ''))
                     purchase_price = safe_decimal(row.get('Average Cost Paid', ''))
                     price_override = safe_decimal(row.get('Price Override', ''))
+                    watchlist_str = row.get('Watchlist', 'false').strip('"').strip().lower()
+                    watchlist     = watchlist_str == 'true'
+                    date_str      = row.get('Date Added', '').strip('"').strip()
+                    date_added    = None
+                    if date_str:
+                        try:
+                            from datetime import date
+                            date_added = date.fromisoformat(date_str)
+                        except ValueError:
+                            date_added = None
                     # Use price override as current price if it is non-zero
                     if price_override and price_override > 0:
                         market_price = price_override
@@ -902,6 +912,8 @@ class DeckViewSet(viewsets.ModelViewSet):
                     notes_csv     = ''
                     market_price  = safe_decimal(row.get('Market Price', ''))
                     purchase_price = safe_decimal(row.get('Acquisition Price', ''))
+                    watchlist     = False
+                    date_added    = None
 
                 if not card_name:
                     continue
@@ -940,6 +952,8 @@ class DeckViewSet(viewsets.ModelViewSet):
                         'grade': '' if grade.lower() == 'ungraded' else grade,
                         'variance': variation,
                         'rarity': rarity,
+                        'watchlist': watchlist,
+                        'date_added': date_added,
                     }
                 )
 

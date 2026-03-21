@@ -223,6 +223,15 @@ class InventoryItem(models.Model):
         default='',
         help_text="Card rarity (e.g. Rare, Ultra Rare, Promo)"
     )
+    watchlist = models.BooleanField(
+        default=False,
+        help_text="Whether this card is on the watchlist"
+    )
+    date_added = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Date the card was added to the portfolio"
+    )
     sku = models.CharField(
         max_length=50,
         unique=True,
