@@ -797,42 +797,40 @@ class DeckViewSet(viewsets.ModelViewSet):
     def import_csv(self, request, pk=None):
         """
         Import cards from a CSV file into this deck.
-        Expects a multipart form with 'file' containing the CSV.
+        Supports two formats:
+          - Legacy (allcards.csv):  Card Name, Number, Set, Condition, Variation, Market Price, Acquisition Price, Quantity
+          - Export (export.csv):    Product Name, Card Number, Set, Card Condition, Variance, Rarity, Grade,
+                                    Average Cost Paid, Quantity, Market Price (As of ...), Price Override, Notes
         """
         import csv
         import io
         import re
-        from decimal import Decimal
-        
+        from decimal import Decimal, InvalidOperation
+
         deck = self.get_object()
-        
+
         if 'file' not in request.FILES:
             return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         csv_file = request.FILES['file']
         clear_deck = request.data.get('clear', 'false').lower() == 'true'
-        
-        # Read the CSV file
+
         try:
             decoded_file = csv_file.read().decode('utf-8')
             reader = csv.DictReader(io.StringIO(decoded_file))
         except Exception as e:
-            logger.error(f'[import_csv] Failed to read CSV for deck "{deck.name}": {e}')
+            logger.error(f'[import_csv] Failed to read CSV: {e}')
             return Response({'error': f'Failed to read CSV: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Log headers so we can diagnose column-name mismatches
+
         rows = list(reader)
-        logger.info(f'[import_csv] Deck="{deck.name}" file="{csv_file.name}" rows={len(rows)} headers={reader.fieldnames}')
+        headers = [h for h in (reader.fieldnames or [])]
+        logger.info(f'[import_csv] Deck="{deck.name}" rows={len(rows)} headers={headers}')
         if rows:
-            logger.info(f'[import_csv] First row sample: {dict(rows[0])}')
-        if len(rows) > 1:
-            logger.info(f'[import_csv] Second row sample: {dict(rows[1])}')
-        
-        # Clear deck if requested
+            logger.info(f'[import_csv] First row: {dict(rows[0])}')
+
         if clear_deck:
             InventoryItem.objects.filter(deck=deck).delete()
-        
-        # Condition mapping — .lower() is applied before lookup so title case is handled
+
         condition_map = {
             'mint': 'mint',
             'near mint': 'near_mint',
@@ -841,86 +839,94 @@ class DeckViewSet(viewsets.ModelViewSet):
             'heavily played': 'heavily_played',
             'damaged': 'damaged',
         }
-        
-        imported = 0
-        updated = 0
-        not_found = 0
-        errors = 0
-        not_found_cards = []
-        
-        # Detect CSV format:
-        # - export.csv has 'Product Name' column
-        # - allcards.csv has 'Card Name' column (and 'Binder')
-        headers = reader.fieldnames or []
+
+        # Detect format: export format has 'Product Name'; legacy has 'Card Name'
         is_export_format = 'Product Name' in headers and 'Card Name' not in headers
 
-        # For export.csv the market price column has a dynamic date suffix
-        # e.g. "Market Price (As of 2026-03-16)" — find it once up front
-        market_price_col = 'Market Price'  # default (old format)
+        # The market price column in export format has a date suffix
+        market_price_col = 'Market Price'
         if is_export_format:
             for h in headers:
                 if h.startswith('Market Price'):
                     market_price_col = h
                     break
 
-        logger.info(f'[import_csv] Detected format: {"export.csv" if is_export_format else "legacy"}, market_price_col="{market_price_col}"')
+        logger.info(f'[import_csv] Format: {"export" if is_export_format else "legacy"}, price_col="{market_price_col}"')
+
+        def safe_decimal(s):
+            try:
+                return Decimal(s.replace('$', '').replace(',', '').strip()) if s and s.strip() else None
+            except (InvalidOperation, Exception):
+                return None
+
+        def safe_int(s, default=1):
+            try:
+                return int(float(s)) if s and str(s).strip() else default
+            except (ValueError, TypeError):
+                return default
+
+        imported = 0
+        updated = 0
+        not_found = 0
+        errors = 0
+        not_found_cards = []
 
         for row in rows:
             try:
-                # ── field extraction — handles both CSV formats ──────────────
                 if is_export_format:
                     card_name     = row.get('Product Name', '').strip('"').strip()
                     card_number   = row.get('Card Number', '').strip('"').strip()
                     set_name      = row.get('Set', '').strip('"').strip()
                     condition_str = row.get('Card Condition', 'near mint').strip('"').strip().lower()
-                    try:
-                        quantity = int(float(row.get('Quantity', 1) or 1))
-                    except (ValueError, TypeError):
-                        quantity = 1
+                    quantity      = safe_int(row.get('Quantity', 1))
                     variation     = row.get('Variance', '').strip('"').strip()
-                    market_price_str   = row.get(market_price_col, '').replace('$', '').replace(',', '').strip()
-                    purchase_price_str = row.get('Average Cost Paid', '').replace('$', '').replace(',', '').strip()
+                    rarity        = row.get('Rarity', '').strip('"').strip()
+                    grade         = row.get('Grade', '').strip('"').strip()
+                    notes_csv     = row.get('Notes', '').strip('"').strip()
+                    market_price  = safe_decimal(row.get(market_price_col, ''))
+                    purchase_price = safe_decimal(row.get('Average Cost Paid', ''))
+                    price_override = safe_decimal(row.get('Price Override', ''))
+                    # Use price override as current price if it is non-zero
+                    if price_override and price_override > 0:
+                        market_price = price_override
                 else:
                     card_name     = row.get('Card Name', '').strip('"').strip()
                     card_number   = row.get('Number', '').strip('"').strip()
                     set_name      = row.get('Set', '').strip('"').strip()
                     condition_str = row.get('Condition', 'near mint').strip('"').strip().lower()
-                    try:
-                        quantity = int(float(row.get('Quantity', 1) or 1))
-                    except (ValueError, TypeError):
-                        quantity = 1
+                    quantity      = safe_int(row.get('Quantity', 1))
                     variation     = row.get('Variation', '').strip('"').strip()
-                    market_price_str   = row.get('Market Price', '').replace('$', '').replace(',', '').strip()
-                    purchase_price_str = row.get('Acquisition Price', '').replace('$', '').replace(',', '').strip()
-                
-                try:
-                    market_price = Decimal(market_price_str) if market_price_str else None
-                except Exception:
-                    market_price = None
-                try:
-                    purchase_price = Decimal(purchase_price_str) if purchase_price_str else None
-                except Exception:
-                    purchase_price = None
+                    rarity        = ''
+                    grade         = ''
+                    notes_csv     = ''
+                    market_price  = safe_decimal(row.get('Market Price', ''))
+                    purchase_price = safe_decimal(row.get('Acquisition Price', ''))
 
                 if not card_name:
                     continue
-                
-                # Map condition
+
                 condition = condition_map.get(condition_str, 'near_mint')
-                
-                # Try to find the card
+
+                # Build notes string from available metadata
+                note_parts = ['Imported from CSV']
+                if variation:
+                    note_parts.append(f'Variation: {variation}')
+                if rarity:
+                    note_parts.append(f'Rarity: {rarity}')
+                if grade and grade.lower() != 'ungraded':
+                    note_parts.append(f'Grade: {grade}')
+                if notes_csv:
+                    note_parts.append(notes_csv)
+                notes_str = ' | '.join(note_parts)
+
                 card = self._find_card(card_name, card_number, set_name)
-                
+
                 if not card:
                     not_found += 1
                     not_found_cards.append(f"{card_name} ({card_number}) - {set_name}")
-                    logger.warning(
-                        f'[import_csv] Not found: name="{card_name}" base_name="{re.sub(chr(40)+"[^)]*"+chr(41)+"$", "", card_name).strip()}" '
-                        f'number="{card_number}" set="{set_name}"'
-                    )
+                    logger.warning(f'[import_csv] Not found: "{card_name}" #{card_number} set="{set_name}"')
                     continue
-                
-                # Get or create inventory item
+
                 inventory_item, inv_created = InventoryItem.objects.get_or_create(
                     card=card,
                     condition=condition,
@@ -929,10 +935,10 @@ class DeckViewSet(viewsets.ModelViewSet):
                         'quantity': quantity,
                         'purchase_price': purchase_price,
                         'current_price': market_price,
-                        'notes': f"Imported from CSV. Variation: {variation}" if variation else "Imported from CSV"
+                        'notes': notes_str,
                     }
                 )
-                
+
                 if inv_created:
                     imported += 1
                 else:
@@ -943,35 +949,29 @@ class DeckViewSet(viewsets.ModelViewSet):
                         inventory_item.current_price = market_price
                     inventory_item.save()
                     updated += 1
-                    
+
             except Exception as e:
                 errors += 1
-                logger.error(f'[import_csv] Error processing row {row}: {e}')
-        
-        logger.info(
-            f'[import_csv] Done deck="{deck.name}": imported={imported} updated={updated} '
-            f'not_found={not_found} errors={errors}'
-        )
+                logger.error(f'[import_csv] Error on row {row}: {e}')
+
+        logger.info(f'[import_csv] Done: imported={imported} updated={updated} not_found={not_found} errors={errors}')
         if not_found_cards:
-            logger.warning(f'[import_csv] Not-found cards (first 20): {not_found_cards[:20]}')
-        
+            logger.warning(f'[import_csv] Not found (first 20): {not_found_cards[:20]}')
+
         return Response({
             'success': True,
             'imported': imported,
             'updated': updated,
             'not_found': not_found,
             'errors': errors,
-            'not_found_cards': not_found_cards[:20],  # First 20
-            'deck': deck.name
+            'not_found_cards': not_found_cards[:20],
+            'deck': deck.name,
         })
 
     def _find_card(self, card_name, card_number, set_name):
         """Find a matching card in the database using multiple strategies."""
         import re
-
-        if not card_name or not card_name.strip():
-            return None
-
+        
         # Clean up the card name (remove parenthetical variations)
         base_name = re.sub(r'\s*\([^)]*\)\s*$', '', card_name).strip()
         
@@ -1002,24 +1002,21 @@ class DeckViewSet(viewsets.ModelViewSet):
             return card
         
         # Strategy 3: Match by card number and set name
-        set_word = set_name.split()[0] if set_name.split() else None
-        base_word = base_name.split()[0] if base_name.split() else None
-        if set_word and base_word:
-            card = Card.objects.filter(
-                Q(card_number__iexact=clean_number) | Q(card_number__iexact=normalized_number),
-                pokemon_set__name__icontains=set_word
-            ).filter(
-                Q(name__icontains=base_word) | Q(name__icontains=base_name)
-            ).exclude(image__isnull=True).exclude(image='').first()
-            if card:
-                return card
-
+        card = Card.objects.filter(
+            Q(card_number__iexact=clean_number) | Q(card_number__iexact=normalized_number),
+            pokemon_set__name__icontains=set_name.split()[0]
+        ).filter(
+            Q(name__icontains=base_name.split()[0]) | Q(name__icontains=base_name)
+        ).exclude(image__isnull=True).exclude(image='').first()
+        if card:
+            return card
+        
         # Strategy 4: Fuzzy match on name, exact on number
         card = Card.objects.filter(
             Q(card_number__iexact=clean_number) | Q(card_number__iexact=normalized_number)
         ).filter(
-            name__icontains=base_word or base_name
-        ).exclude(image__isnull=True).exclude(image='').first() if (base_word or base_name) else None
+            name__icontains=base_name.split()[0]
+        ).exclude(image__isnull=True).exclude(image='').first()
         if card:
             return card
         
