@@ -460,9 +460,6 @@ export default function DecksPage() {
                 const tier = TIERS.find(t => t.key === tierKey)!
                 const cards = inventory.filter(item => item.prestige === tierKey)
                 if (cards.length === 0) return null
-                const shouldScroll = cards.length >= 8
-                const displayCards = shouldScroll ? [...cards, ...cards] : cards
-                const speed = Math.max(10, cards.length * 4)
 
                 return (
                   <div key={tierKey}>
@@ -477,25 +474,9 @@ export default function DecksPage() {
                       <div className="flex-1 h-px" style={{ background: tier.condBorder }} />
                     </div>
 
-                    {shouldScroll ? (
-                      /* Scrolling row */
-                      <div className="overflow-hidden">
-                        <div
-                          className="flex gap-3"
-                          style={{
-                            animation: `scroll-left ${speed}s linear infinite`,
-                            width: `${displayCards.length * 148}px`,
-                          }}
-                        >
-                          {displayCards.map((item, idx) => renderInventoryCard(item, idx))}
-                        </div>
-                      </div>
-                    ) : (
-                      /* Static row — larger cards, centred */
-                      <div className="flex flex-wrap justify-center gap-4">
-                        {cards.map((item, idx) => renderInventoryCard(item, idx, true))}
-                      </div>
-                    )}
+                    <div className="flex flex-wrap gap-3">
+                      {cards.map((item, idx) => renderInventoryCard(item, idx, true))}
+                    </div>
                   </div>
                 )
               })}
@@ -505,9 +486,6 @@ export default function DecksPage() {
                 const knownTiers = new Set(TIER_ORDER as readonly string[])
                 const cards = inventory.filter(item => !knownTiers.has(item.prestige))
                 if (cards.length === 0) return null
-                const shouldScroll = cards.length >= 8
-                const displayCards = shouldScroll ? [...cards, ...cards] : cards
-                const speed = Math.max(10, cards.length * 4)
 
                 return (
                   <div>
@@ -518,23 +496,9 @@ export default function DecksPage() {
                       </span>
                       <div className="flex-1 h-px bg-white/10" />
                     </div>
-                    {shouldScroll ? (
-                      <div className="overflow-hidden">
-                        <div
-                          className="flex gap-3"
-                          style={{
-                            animation: `scroll-left ${speed}s linear infinite`,
-                            width: `${displayCards.length * 148}px`,
-                          }}
-                        >
-                          {displayCards.map((item, idx) => renderInventoryCard(item, idx))}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-wrap justify-center gap-4">
-                        {cards.map((item, idx) => renderInventoryCard(item, idx, true))}
-                      </div>
-                    )}
+                    <div className="flex flex-wrap gap-3">
+                      {cards.map((item, idx) => renderInventoryCard(item, idx, true))}
+                    </div>
                   </div>
                 )
               })()}
