@@ -1200,6 +1200,13 @@ class DeckViewSet(viewsets.ModelViewSet):
             inventory_item.qr_sequence = _max_seq + 1
             inventory_item.save(update_fields=['qr_sequence'])
 
+        # Safety net: if an existing item somehow still has no sequence, assign one now
+        if inventory_item.qr_sequence is None:
+            from django.db.models import Max as _Max
+            _max_seq = InventoryItem.objects.exclude(pk=inventory_item.pk).aggregate(_Max('qr_sequence'))['qr_sequence__max'] or 0
+            inventory_item.qr_sequence = _max_seq + 1
+            inventory_item.save(update_fields=['qr_sequence'])
+
         return Response({
             'success': True,
             'created': created,
