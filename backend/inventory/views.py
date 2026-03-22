@@ -989,6 +989,7 @@ class DeckViewSet(viewsets.ModelViewSet):
         not_found = 0
         errors = 0
         not_found_cards = []
+        fuzzy_match_cards = []  # cards imported but with a suspicious/inexact name match
         error_details = []
         to_create: list = []
 
@@ -1062,6 +1063,24 @@ class DeckViewSet(viewsets.ModelViewSet):
                     logger.warning(f'[import_csv] Not found: "{card_name}" #{card_number} set="{set_name}"')
                     continue
 
+                # Check whether the match is exact (case-insensitive)
+                _re_strip = __import__('re')
+                _base_csv = _re_strip.sub(r'\s*\([^)]*\)\s*$', '', card_name).strip()
+                _matched_exact = (
+                    card.name.lower() == card_name.lower() or
+                    card.name.lower() == _base_csv.lower()
+                )
+                if not _matched_exact:
+                    _is_jp = '(jp)' in card_name.lower() or 'japanese' in set_name.lower()
+                    _label = 'Japanese card' if _is_jp else 'Inexact match'
+                    fuzzy_match_cards.append(
+                        f"{card_name} ({card_number}) - {set_name} → matched as '{card.name}' [{_label}]"
+                    )
+                    logger.warning(
+                        f'[import_csv] Fuzzy match ({_label}): "{card_name}" → "{card.name}" '
+                        f'#{card_number} set="{set_name}"'
+                    )
+
                 new_item = InventoryItem(
                     card=card,
                     condition=condition,
@@ -1096,9 +1115,11 @@ class DeckViewSet(viewsets.ModelViewSet):
                 InventoryItem.objects.bulk_create(to_create, batch_size=500)
                 logger.info(f'[import_csv] bulk_create {len(to_create)} items')
 
-        logger.info(f'[import_csv] Done: imported={imported} not_found={not_found} errors={errors}')
+        logger.info(f'[import_csv] Done: imported={imported} not_found={not_found} errors={errors} fuzzy={len(fuzzy_match_cards)}')
         if not_found_cards:
             logger.warning(f'[import_csv] Not found (first 20): {not_found_cards[:20]}')
+        if fuzzy_match_cards:
+            logger.warning(f'[import_csv] Fuzzy matches (first 20): {fuzzy_match_cards[:20]}')
 
         return Response({
             'success': True,
@@ -1107,6 +1128,7 @@ class DeckViewSet(viewsets.ModelViewSet):
             'errors': errors,
             'error_details': error_details[:10],
             'not_found_cards': not_found_cards,
+            'fuzzy_match_cards': fuzzy_match_cards,
             'deck': deck.name,
         })
 

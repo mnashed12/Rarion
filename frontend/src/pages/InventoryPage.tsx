@@ -210,8 +210,8 @@ function InventoryPage() {
   const [carouselNotification, setCarouselNotification] = useState<InventoryItem | null>(null)
   const [uploadingDeckId, setUploadingDeckId] = useState<number | null>(null)
   const [importModal, setImportModal] = useState<{ deckName: string; phase: number } | null>(null)
-  const [importResult, setImportResult] = useState<{ imported: number; updated: number; not_found: number; not_found_cards?: string[]; errors?: number; error_details?: string[] } | null>(null)
-  const [failedCards, setFailedCards] = useState<{ deckId: number; deckName: string; cards: string[] } | null>(() => {
+  const [importResult, setImportResult] = useState<{ imported: number; updated: number; not_found: number; not_found_cards?: string[]; fuzzy_match_cards?: string[]; errors?: number; error_details?: string[] } | null>(null)
+  const [failedCards, setFailedCards] = useState<{ deckId: number; deckName: string; cards: string[]; fuzzyCards?: string[] } | null>(() => {
     try {
       const stored = localStorage.getItem('pakmak_failed_cards')
       return stored ? JSON.parse(stored) : null
@@ -452,8 +452,13 @@ function InventoryPage() {
       await refreshDecks()
       
       // Persist failed cards so user can add them manually
-      if (result.not_found_cards && result.not_found_cards.length > 0) {
-        setFailedCards({ deckId: deckId, deckName: deck?.name || 'Deck', cards: result.not_found_cards })
+      if ((result.not_found_cards && result.not_found_cards.length > 0) || (result.fuzzy_match_cards && result.fuzzy_match_cards.length > 0)) {
+        setFailedCards({
+          deckId: deckId,
+          deckName: deck?.name || 'Deck',
+          cards: result.not_found_cards || [],
+          fuzzyCards: result.fuzzy_match_cards || [],
+        })
 
       }
 
@@ -642,7 +647,8 @@ function InventoryPage() {
       // Remove this card from the failed list if it was there
       if (failedCards) {
         const remaining = failedCards.cards.filter(c => !c.toLowerCase().includes(manualAddForm.name.toLowerCase()))
-        setFailedCards(remaining.length > 0 ? { ...failedCards, cards: remaining } : null)
+        const noMore = remaining.length === 0 && (failedCards.fuzzyCards?.length ?? 0) === 0
+        setFailedCards(noMore ? null : { ...failedCards, cards: remaining })
       }
 
       setToast({ message: `${manualAddForm.name} added to deck!`, type: 'success' })
@@ -1165,7 +1171,7 @@ function InventoryPage() {
             <div className="relative flex items-center justify-center h-12 px-4 rounded-xl border-2 border-orange-300 bg-orange-50 text-orange-600 font-bold">
               <AlertTriangle className="w-5 h-5" />
               <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-orange-500 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1">
-                {failedCards.cards.length}
+                {failedCards.cards.length + (failedCards.fuzzyCards?.length ?? 0)}
               </span>
             </div>
           )}
@@ -1173,34 +1179,72 @@ function InventoryPage() {
 
         {/* Failed imports banner — stays until all cards are manually added */}
         {failedCards && failedCards.deckId === selectedDeck.id && (
-          <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-4">
-            <p className="text-orange-700 font-bold text-sm mb-2">
-              ⚠ {failedCards.cards.length} card{failedCards.cards.length !== 1 ? 's' : ''} not found in the database — add them manually:
-            </p>
-            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-              {failedCards.cards.map((card, i) => {
-                // Format: "Card Name (number) - Set Name"
-                const nameMatch = card.match(/^(.+?)\s*\(([^)]+)\)\s*-\s*(.+)$/)
-                const namePart    = nameMatch ? nameMatch[1].trim() : card.split(' (')[0]
-                const numberPart  = nameMatch ? nameMatch[2].trim() : ''
-                const setPart     = nameMatch ? nameMatch[3].trim() : ''
-                return (
-                  <div key={i} className="flex items-center gap-3">
-                    <span className="text-orange-600 text-xs font-mono truncate flex-1">{card}</span>
-                    <button
-                      onClick={() => {
-                        setManualAddForm({ name: namePart, set_name: setPart, card_number: numberPart, condition: 'near_mint', quantity: '1', purchase_price: '', current_price: '', notes: '' })
-                        setManualAddImage(null)
-                        setManualAddModal({ deckId: selectedDeck.id, deckName: selectedDeck.name, prefill: card })
-                      }}
-                      className="flex-shrink-0 px-4 py-1.5 text-sm font-bold bg-orange-500 text-white rounded-lg hover:bg-orange-600 active:scale-95 transition-all"
-                    >
-                      Add
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
+          <div className="space-y-3">
+            {/* Not found section */}
+            {failedCards.cards.length > 0 && (
+              <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-4">
+                <p className="text-orange-700 font-bold text-sm mb-2">
+                  ⚠ {failedCards.cards.length} card{failedCards.cards.length !== 1 ? 's' : ''} not found in the database — add them manually:
+                </p>
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {failedCards.cards.map((card, i) => {
+                    const nameMatch = card.match(/^(.+?)\s*\(([^)]+)\)\s*-\s*(.+)$/)
+                    const namePart   = nameMatch ? nameMatch[1].trim() : card.split(' (')[0]
+                    const numberPart = nameMatch ? nameMatch[2].trim() : ''
+                    const setPart    = nameMatch ? nameMatch[3].trim() : ''
+                    return (
+                      <div key={i} className="flex items-center gap-3">
+                        <span className="text-orange-600 text-xs font-mono truncate flex-1">{card}</span>
+                        <button
+                          onClick={() => {
+                            setManualAddForm({ name: namePart, set_name: setPart, card_number: numberPart, condition: 'near_mint', quantity: '1', purchase_price: '', current_price: '', notes: '' })
+                            setManualAddImage(null)
+                            setManualAddModal({ deckId: selectedDeck.id, deckName: selectedDeck.name, prefill: card })
+                          }}
+                          className="flex-shrink-0 px-4 py-1.5 text-sm font-bold bg-orange-500 text-white rounded-lg hover:bg-orange-600 active:scale-95 transition-all"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Fuzzy / Japanese match section */}
+            {failedCards.fuzzyCards && failedCards.fuzzyCards.length > 0 && (
+              <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4">
+                <p className="text-yellow-800 font-bold text-sm mb-1">
+                  🇯🇵 {failedCards.fuzzyCards.length} card{failedCards.fuzzyCards.length !== 1 ? 's were' : ' was'} imported with an inexact match — please verify or edit:
+                </p>
+                <p className="text-yellow-700 text-xs mb-3">These cards may be Japanese versions or alternate printings that could not be matched exactly. The closest card was imported — use the Edit button on the row to correct name, image, or number.</p>
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {failedCards.fuzzyCards.map((card, i) => {
+                    // Format: "Card Name (num) - Set → matched as 'X' [label]"
+                    const arrowIdx = card.indexOf(' → matched as ')
+                    const original = arrowIdx !== -1 ? card.slice(0, arrowIdx) : card
+                    const matched  = arrowIdx !== -1 ? card.slice(arrowIdx + 14) : ''
+                    return (
+                      <div key={i} className="flex items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-yellow-800 text-xs font-bold truncate">CSV: {original}</div>
+                          {matched && <div className="text-yellow-600 text-xs truncate">Matched: {matched}</div>}
+                        </div>
+                        <button
+                          onClick={() => {
+                            setFailedCards(prev => prev ? { ...prev, fuzzyCards: prev.fuzzyCards?.filter((_, j) => j !== i) } : prev)
+                          }}
+                          className="flex-shrink-0 px-3 py-1.5 text-xs font-bold bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 active:scale-95 transition-all"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
