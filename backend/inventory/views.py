@@ -612,19 +612,20 @@ class DeckViewSet(viewsets.ModelViewSet):
     def print_labels(self, request, pk=None):
         """
         Generate a printable HTML page with QR code labels for all cards in the deck.
+        Each label shows ONLY the QR code and the card's global sequence number.
         Labels are sized to fit Pokemon card dimensions (2.5" x 3.5").
         """
         import qrcode
         from io import BytesIO
-        
+
         deck = self.get_object()
         items = InventoryItem.objects.select_related('card', 'card__pokemon_set').filter(
-            deck=deck, 
+            deck=deck,
             sold_at__isnull=True  # Only unsold cards
-        ).order_by('card__name')
-        
+        ).order_by('qr_sequence', 'id')
+
         labels_html = []
-        
+
         for item in items:
             # Generate QR code
             qr = qrcode.QRCode(
@@ -635,42 +636,24 @@ class DeckViewSet(viewsets.ModelViewSet):
             )
             qr.add_data(str(item.auction_code))
             qr.make(fit=True)
-            
-            # Create image
+
             qr_img = qr.make_image(fill_color="black", back_color="white")
-            
-            # Convert to base64
             buffer = BytesIO()
             qr_img.save(buffer, format='PNG')
             qr_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-            
-            # Card info
-            card_name = item.card.name if item.card else 'Unknown'
-            set_name = item.card.pokemon_set.name if item.card and item.card.pokemon_set else 'Unknown Set'
-            card_number = item.card.card_number if item.card else ''
-            condition = item.get_condition_display() if hasattr(item, 'get_condition_display') else item.condition
-            price = f"${item.current_price:.2f}" if item.current_price else 'N/A'
-            
-            # Truncate long names
-            display_name = card_name[:25] + '...' if len(card_name) > 25 else card_name
-            display_set = set_name[:20] + '...' if len(set_name) > 20 else set_name
-            
+
+            seq_display = str(item.qr_sequence) if item.qr_sequence else '—'
+
             label_html = f'''
             <div class="label">
                 <div class="qr-container">
                     <img src="data:image/png;base64,{qr_base64}" alt="QR Code" />
                 </div>
-                <div class="card-info">
-                    <div class="card-name">{display_name}</div>
-                    <div class="card-set">{display_set}</div>
-                    <div class="card-details">#{card_number} • {condition}</div>
-                    <div class="card-price">{price}</div>
-                </div>
+                <div class="seq-number">#{seq_display}</div>
             </div>
             '''
             labels_html.append(label_html)
-        
-        # Build full HTML page
+
         html = f'''
         <!DOCTYPE html>
         <html>
@@ -697,14 +680,8 @@ class DeckViewSet(viewsets.ModelViewSet):
                     border-bottom: 2px solid #333;
                     margin-bottom: 10px;
                 }}
-                .header h1 {{
-                    font-size: 18px;
-                    margin: 0;
-                }}
-                .header p {{
-                    font-size: 12px;
-                    color: #666;
-                }}
+                .header h1 {{ font-size: 18px; }}
+                .header p {{ font-size: 12px; color: #666; }}
                 .labels-container {{
                     display: flex;
                     flex-wrap: wrap;
@@ -721,64 +698,44 @@ class DeckViewSet(viewsets.ModelViewSet):
                     display: flex;
                     flex-direction: column;
                     align-items: center;
-                    background: linear-gradient(135deg, #f8f8f8 0%, #fff 100%);
+                    justify-content: center;
+                    background: white;
                     page-break-inside: avoid;
                 }}
                 .qr-container {{
-                    flex: 1;
                     display: flex;
                     align-items: center;
                     justify-content: center;
+                    flex: 1;
                 }}
                 .qr-container img {{
-                    width: 150px;
-                    height: 150px;
+                    width: 180px;
+                    height: 180px;
                 }}
-                .card-info {{
-                    width: 100%;
+                .seq-number {{
+                    font-size: 28px;
+                    font-weight: 900;
+                    color: #111;
+                    letter-spacing: 1px;
                     text-align: center;
                     padding-top: 8px;
-                    border-top: 1px solid #ddd;
-                }}
-                .card-name {{
-                    font-size: 14px;
-                    font-weight: bold;
-                    color: #333;
-                    margin-bottom: 4px;
-                }}
-                .card-set {{
-                    font-size: 11px;
-                    color: #666;
-                    margin-bottom: 2px;
-                }}
-                .card-details {{
-                    font-size: 10px;
-                    color: #888;
-                    margin-bottom: 4px;
-                }}
-                .card-price {{
-                    font-size: 16px;
-                    font-weight: bold;
-                    color: #059669;
+                    border-top: 2px solid #eee;
+                    width: 100%;
                 }}
                 @media print {{
                     .header {{
                         position: fixed;
-                        top: 0;
-                        left: 0;
-                        right: 0;
+                        top: 0; left: 0; right: 0;
                         background: white;
                     }}
-                    .labels-container {{
-                        margin-top: 50px;
-                    }}
+                    .labels-container {{ margin-top: 50px; }}
                 }}
             </style>
         </head>
         <body>
             <div class="header">
-                <h1>{deck.name} - QR Labels</h1>
-                <p>{len(labels_html)} cards • Print and cut along borders</p>
+                <h1>{deck.name} — QR Labels</h1>
+                <p>{len(labels_html)} cards &bull; Print and cut along borders</p>
             </div>
             <div class="labels-container">
                 {''.join(labels_html)}
@@ -786,7 +743,7 @@ class DeckViewSet(viewsets.ModelViewSet):
         </body>
         </html>
         '''
-        
+
         return HttpResponse(html, content_type='text/html')
 
     @action(detail=True, methods=['post'])
@@ -1105,13 +1062,21 @@ class DeckViewSet(viewsets.ModelViewSet):
                 logger.error(f'[import_csv] Error on row {row}: {e}')
 
         # ------------------------------------------------------------------
-        # Flush to DB in two bulk queries instead of N individual queries
+        # ------------------------------------------------------------------
+        # Flush to DB and assign global sequential QR numbers
         # ------------------------------------------------------------------
         from django.db import transaction as _tx
+        from django.db.models import Max as _Max
         with _tx.atomic():
             if to_create:
+                # Assign qr_sequence: sort by price desc so highest-value card
+                # in the deck gets the lowest number globally.
+                _max_seq = InventoryItem.objects.aggregate(_Max('qr_sequence'))['qr_sequence__max'] or 0
+                _sorted = sorted(to_create, key=lambda x: float(x.current_price or 0), reverse=True)
+                for _i, _item in enumerate(_sorted):
+                    _item.qr_sequence = _max_seq + _i + 1
                 InventoryItem.objects.bulk_create(to_create, batch_size=500)
-                logger.info(f'[import_csv] bulk_create {len(to_create)} items')
+                logger.info(f'[import_csv] bulk_create {len(to_create)} items (seq {_max_seq + 1}–{_max_seq + len(to_create)})')
 
         logger.info(f'[import_csv] Done: imported={imported} not_found={not_found} errors={errors} fuzzy={len(fuzzy_match_cards)}')
         if not_found_cards:
@@ -1228,6 +1193,12 @@ class DeckViewSet(viewsets.ModelViewSet):
             if current_price:
                 inventory_item.current_price = current_price
             inventory_item.save()
+        else:
+            # Assign the next global qr_sequence to this manually-added card
+            from django.db.models import Max as _Max
+            _max_seq = InventoryItem.objects.exclude(pk=inventory_item.pk).aggregate(_Max('qr_sequence'))['qr_sequence__max'] or 0
+            inventory_item.qr_sequence = _max_seq + 1
+            inventory_item.save(update_fields=['qr_sequence'])
 
         return Response({
             'success': True,

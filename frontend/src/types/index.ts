@@ -223,6 +223,7 @@ export interface InventoryItem {
   notes: string
   sku: string
   auction_code: string
+  qr_sequence: number | null
   sold_at: string | null
   created_at: string
   updated_at: string

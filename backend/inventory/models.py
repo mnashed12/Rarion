@@ -254,6 +254,13 @@ class InventoryItem(models.Model):
         editable=False,
         help_text="Unique code for QR/barcode scanning during auctions"
     )
+    qr_sequence = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        unique=True,
+        db_index=True,
+        help_text="Global sequential number printed on QR label (highest-value card in deck = lowest number)"
+    )
     sold_at = models.DateTimeField(
         null=True,
         blank=True,

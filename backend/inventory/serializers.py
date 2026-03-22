@@ -238,11 +238,12 @@ class InventoryItemSerializer(serializers.ModelSerializer):
             'deck',
             'deck_id',
             'auction_code',
+            'qr_sequence',
             'sold_at',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'sku', 'auction_code', 'created_at', 'updated_at', 'total_value', 'profit_margin']
+        read_only_fields = ['id', 'sku', 'auction_code', 'qr_sequence', 'created_at', 'updated_at', 'total_value', 'profit_margin']
     
     def get_total_value(self, obj):
         """Calculate total value of inventory item."""
