@@ -35,7 +35,7 @@ import {
 import { Link } from 'react-router-dom'
 import { Html5Qrcode } from 'html5-qrcode'
 import apiClient, { API_BASE_URL } from '../services/api'
-import type { InventoryItem, Deck } from '../types'
+import type { InventoryItem, Deck, CardSummary } from '../types'
 import { Toast, ConfirmModal, type ToastType } from '../components/common'
 
 // ── prestige config (mirrors HomePage) ───────────────────────────────────────
@@ -223,7 +223,7 @@ function InventoryPage() {
   const [manualAddImage, setManualAddImage] = useState<File | null>(null)
   const [manualAddLoading, setManualAddLoading] = useState(false)
   const [editItem, setEditItem] = useState<InventoryItem | null>(null)
-  const [editForm, setEditForm] = useState({ condition: 'near_mint', quantity: '1', purchase_price: '', current_price: '', notes: '', prestige: 'star', location: '' })
+  const [editForm, setEditForm] = useState({ condition: 'near_mint', quantity: '1', purchase_price: '', current_price: '', notes: '', prestige: 'star', location: '', card_name: '', card_number: '', card_image: '', card_rarity: 'common', card_type: 'pokemon' })
   const [editLoading, setEditLoading] = useState(false)
   const [deckModal, setDeckModal] = useState<{ mode: 'create' | 'rename'; deck?: Deck; name: string; background_image: 'PAKMAKDECK' | 'DANNYDECK' } | null>(null)
   const [_deckStats, setDeckStats] = useState<{ total_items: number; total_quantity: number; total_value: number; low_stock: number } | null>(null)
@@ -1397,6 +1397,11 @@ function InventoryPage() {
                             notes: item.notes ?? '',
                             prestige: item.prestige,
                             location: item.location ?? '',
+                            card_name: item.card_detail?.name ?? '',
+                            card_number: item.card_detail?.card_number ?? '',
+                            card_image: item.card_detail?.image ?? '',
+                            card_rarity: item.card_detail?.rarity ?? 'common',
+                            card_type: item.card_detail?.card_type ?? 'pokemon',
                           })
                         }}
                         className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
@@ -1561,6 +1566,11 @@ function InventoryPage() {
                               notes: item.notes ?? '',
                               prestige: item.prestige,
                               location: item.location ?? '',
+                              card_name: item.card_detail?.name ?? '',
+                              card_number: item.card_detail?.card_number ?? '',
+                              card_image: item.card_detail?.image ?? '',
+                              card_rarity: item.card_detail?.rarity ?? 'common',
+                              card_type: item.card_detail?.card_type ?? 'pokemon',
                             })
                           }}
                           className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
@@ -1982,6 +1992,83 @@ function InventoryPage() {
 
             {/* Fields */}
             <div className="px-6 py-4 space-y-4 max-h-[65vh] overflow-y-auto">
+
+              {/* ── Card Details ───────────────────────────────── */}
+              <p className="text-xs font-bold text-blue-500 uppercase tracking-widest">Card Details</p>
+
+              {/* Card Name */}
+              <div>
+                <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Card Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Charizard"
+                  value={editForm.card_name}
+                  onChange={e => setEditForm(f => ({ ...f, card_name: e.target.value }))}
+                  className="w-full h-10 px-3 rounded-lg border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-medium"
+                />
+              </div>
+
+              {/* Card Number */}
+              <div>
+                <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Card Number</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 4/102"
+                  value={editForm.card_number}
+                  onChange={e => setEditForm(f => ({ ...f, card_number: e.target.value }))}
+                  className="w-full h-10 px-3 rounded-lg border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-medium"
+                />
+              </div>
+
+              {/* Image URL */}
+              <div>
+                <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Image URL</label>
+                {editForm.card_image && (
+                  <img src={editForm.card_image} alt="Preview" className="w-20 h-28 object-contain rounded-lg mb-2 bg-gray-100 border border-gray-200" />
+                )}
+                <input
+                  type="text"
+                  placeholder="https://…"
+                  value={editForm.card_image}
+                  onChange={e => setEditForm(f => ({ ...f, card_image: e.target.value }))}
+                  className="w-full h-10 px-3 rounded-lg border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-medium"
+                />
+              </div>
+
+              {/* Rarity + Type */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Rarity</label>
+                  <select
+                    value={editForm.card_rarity}
+                    onChange={e => setEditForm(f => ({ ...f, card_rarity: e.target.value }))}
+                    className="w-full h-10 px-3 rounded-lg border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-medium"
+                  >
+                    <option value="common">Common</option>
+                    <option value="uncommon">Uncommon</option>
+                    <option value="rare">Rare</option>
+                    <option value="holo_rare">Holo Rare</option>
+                    <option value="ultra_rare">Ultra Rare</option>
+                    <option value="secret_rare">Secret Rare</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Type</label>
+                  <select
+                    value={editForm.card_type}
+                    onChange={e => setEditForm(f => ({ ...f, card_type: e.target.value }))}
+                    className="w-full h-10 px-3 rounded-lg border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-medium"
+                  >
+                    <option value="pokemon">Pokémon</option>
+                    <option value="trainer">Trainer</option>
+                    <option value="energy">Energy</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* ── Inventory Details ───────────────────────────── */}
+              <p className="text-xs font-bold text-blue-500 uppercase tracking-widest pt-2">Inventory Details</p>
+
               {/* Condition */}
               <div>
                 <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Condition</label>
@@ -2091,6 +2178,17 @@ function InventoryPage() {
                 onClick={async () => {
                   setEditLoading(true)
                   try {
+                    // PATCH card detail if it has an id
+                    if (editItem.card_detail?.id) {
+                      await apiClient.patch(`/cards/${editItem.card_detail.id}/`, {
+                        name: editForm.card_name,
+                        card_number: editForm.card_number,
+                        image: editForm.card_image || null,
+                        rarity: editForm.card_rarity,
+                        card_type: editForm.card_type,
+                      })
+                    }
+                    // PATCH inventory item
                     await apiClient.patch(`/inventory/${editItem.id}/`, {
                       condition: editForm.condition,
                       prestige: editForm.prestige,
@@ -2102,7 +2200,24 @@ function InventoryPage() {
                     })
                     setInventory(prev => prev.map(i =>
                       i.id === editItem.id
-                        ? { ...i, condition: editForm.condition as InventoryItem['condition'], prestige: editForm.prestige, quantity: parseInt(editForm.quantity) || 0, purchase_price: editForm.purchase_price || null, current_price: editForm.current_price || null, notes: editForm.notes, location: editForm.location }
+                        ? {
+                            ...i,
+                            condition: editForm.condition as InventoryItem['condition'],
+                            prestige: editForm.prestige,
+                            quantity: parseInt(editForm.quantity) || 0,
+                            purchase_price: editForm.purchase_price || null,
+                            current_price: editForm.current_price || null,
+                            notes: editForm.notes,
+                            location: editForm.location,
+                            card_detail: i.card_detail ? {
+                              ...i.card_detail,
+                              name: editForm.card_name,
+                              card_number: editForm.card_number,
+                              image: editForm.card_image || null,
+                              rarity: editForm.card_rarity as CardSummary['rarity'],
+                              card_type: editForm.card_type as CardSummary['card_type'],
+                            } : i.card_detail,
+                          }
                         : i
                     ))
                     setEditItem(null)
