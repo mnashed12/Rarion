@@ -180,38 +180,6 @@ function PullNotification({ item, onDone }: { item: InventoryItem; onDone: () =>
   )
 }
 
-// ── single card tile used in the deck view modal ─────────────────────────────
-function CarouselCard({ item, isFaded }: { item: InventoryItem; isFaded: boolean }) {
-  const isSold = !!item.sold_at
-  return (
-    <div className="relative w-full aspect-[2.5/3.5]">
-      <div className={`absolute inset-0 rounded-xl overflow-hidden shadow-lg transition-opacity ${isFaded ? 'opacity-30' : isSold ? 'opacity-40 grayscale' : 'opacity-100'}`}>
-        <div className="w-full h-full bg-gradient-to-br from-gray-700 to-gray-800">
-          {item.card_detail?.image ? (
-            <img
-              src={item.card_detail.image}
-              alt={item.card_detail?.name || 'Card'}
-              className="w-full h-full object-contain"
-              loading="lazy"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Package className="w-8 h-8 text-gray-500" />
-            </div>
-          )}
-        </div>
-      </div>
-      {isSold && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-          <div className="bg-red-600/85 text-white font-black text-sm px-3 py-1 rounded-lg shadow-lg tracking-widest" style={{ transform: 'rotate(-18deg)' }}>
-            PULLED
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
 // Map deck background_image key → filename (default: PAKMAKDECK.PNG)
 function getDeckImage(deck: Deck): string {
   if (deck.background_image === 'DANNYDECK') return 'DANNYDECK.PNG'
@@ -2335,67 +2303,72 @@ function InventoryPage() {
         </div>
       )}
 
-      {/* Deck View Modal — static scrollable grid */}
+      {/* Carousel Modal */}
       {carouselDeck && carouselCards.length > 0 && (
-        <div className="fixed inset-0 z-[60] bg-black/95 animate-fade-in flex flex-col">
-          {/* Header */}
-          <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-white/10">
-            <div>
-              <h2 className="text-white font-black text-xl">{carouselDeck.name}</h2>
-              <p className="text-white/50 text-xs mt-0.5">{carouselCards.length} cards</p>
-            </div>
-            <button
-              onClick={() => {
-                setCarouselDeck(null)
-                setCarouselCards([])
-                setCarouselIndex(0)
-              }}
-              className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-
-          {/* Scrollable card grid */}
-          <div className="flex-1 overflow-y-auto px-4 py-4">
-            {/* Rarion & Cosmos row */}
-            {carouselCards.some(c => c.prestige === 'rarion' || c.prestige === 'cosmos') && (
-              <div className="mb-6">
-                <p className="text-white/40 text-xs font-bold uppercase tracking-widest mb-3 px-1">✦ Rarion &amp; Cosmos</p>
-                <div className="overflow-x-auto pb-2">
-                  <div className="flex gap-3" style={{ width: 'max-content' }}>
-                    {carouselCards.filter(c => c.prestige === 'rarion' || c.prestige === 'cosmos').map((item) => (
-                      <div key={item.id} className="flex-shrink-0 w-40">
-                        <CarouselCard item={item} isFaded={fadedCards.has(item.id)} />
-                      </div>
-                    ))}
+        <div className="fixed inset-0 z-[60] bg-black/95 animate-fade-in overflow-hidden">
+          <button
+            onClick={() => { setCarouselDeck(null); setCarouselCards([]); setCarouselIndex(0) }}
+            className="absolute top-6 right-6 z-10 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all shadow-2xl"
+          >
+            <X className="w-6 h-6" />
+          </button>
+          {(() => {
+            const renderRow = (rowCards: typeof carouselCards, cardWidth = 180, extraPaddingTop = 0) => {
+              if (rowCards.length === 0) return null
+              const doubled = [...rowCards, ...rowCards]
+              const slotWidth = cardWidth + 12
+              return (
+                <div className="flex-1 overflow-hidden flex items-center" style={{ paddingTop: extraPaddingTop }}>
+                  <div
+                    className="flex gap-3 px-4"
+                    style={{
+                      animation: `scroll-left ${rowCards.length * 3}s linear infinite`,
+                      width: `${doubled.length * slotWidth}px`,
+                    }}
+                  >
+                    {doubled.map((item, idx) => {
+                      const isFaded = fadedCards.has(item.id)
+                      const isSold  = !!item.sold_at
+                      return (
+                        <div key={`${item.id}-${idx}`} className="flex-shrink-0" style={{ width: `${cardWidth}px`, perspective: '1000px' }}>
+                          <div className="relative w-full aspect-[2.5/3.5]">
+                            <div className={`absolute inset-0 rounded-2xl overflow-hidden shadow-2xl ${isFaded ? 'opacity-30' : isSold ? 'opacity-40 grayscale' : 'opacity-100'}`}>
+                              <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
+                                {item.card_detail?.image ? (
+                                  <img src={item.card_detail.image} alt={item.card_detail?.name || 'Card'} className="w-full h-full object-contain" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <Package className="w-20 h-20 text-gray-400" />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            {isSold && (
+                              <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+                                <div className="bg-red-600/85 text-white font-black text-xl px-5 py-2 rounded-xl shadow-lg tracking-widest" style={{ transform: 'rotate(-18deg)' }}>
+                                  PULLED
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
+              )
+            }
+            const topRow    = carouselCards.filter(c => c.prestige === 'rarion' || c.prestige === 'cosmos')
+            const bottomRow = carouselCards.filter(c => c.prestige !== 'rarion' && c.prestige !== 'cosmos')
+            return (
+              <div className="fixed inset-0 bg-black pt-10 pb-8 flex flex-col gap-4">
+                {renderRow(topRow, 220, 32)}
+                {renderRow(bottomRow, 160)}
               </div>
-            )}
-            {/* Galaxy & Star row */}
-            {carouselCards.some(c => c.prestige !== 'rarion' && c.prestige !== 'cosmos') && (
-              <div>
-                <p className="text-white/40 text-xs font-bold uppercase tracking-widest mb-3 px-1">★ Galaxy &amp; Star</p>
-                <div className="overflow-x-auto pb-2">
-                  <div className="flex gap-2" style={{ width: 'max-content' }}>
-                    {carouselCards.filter(c => c.prestige !== 'rarion' && c.prestige !== 'cosmos').map((item) => (
-                      <div key={item.id} className="flex-shrink-0 w-28">
-                        <CarouselCard item={item} isFaded={fadedCards.has(item.id)} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Pull notification */}
+            )
+          })()}
           {carouselNotification && (
-            <PullNotification
-              item={carouselNotification}
-              onDone={() => setCarouselNotification(null)}
-            />
+            <PullNotification item={carouselNotification} onDone={() => setCarouselNotification(null)} />
           )}
         </div>
       )}
