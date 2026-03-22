@@ -224,6 +224,7 @@ function InventoryPage() {
   const [manualAddLoading, setManualAddLoading] = useState(false)
   const [editItem, setEditItem] = useState<InventoryItem | null>(null)
   const [editForm, setEditForm] = useState({ condition: 'near_mint', quantity: '1', purchase_price: '', current_price: '', notes: '', prestige: 'star', location: '', card_name: '', card_number: '', card_image: '', card_rarity: 'common', card_type: 'pokemon' })
+  const [editImage, setEditImage] = useState<File | null>(null)
   const [editLoading, setEditLoading] = useState(false)
   const [deckModal, setDeckModal] = useState<{ mode: 'create' | 'rename'; deck?: Deck; name: string; background_image: 'PAKMAKDECK' | 'DANNYDECK' } | null>(null)
   const [_deckStats, setDeckStats] = useState<{ total_items: number; total_quantity: number; total_value: number; low_stock: number } | null>(null)
@@ -644,11 +645,14 @@ function InventoryPage() {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
 
-      // Remove this card from the failed list if it was there
+      // Remove this card from both failed lists if it was there
       if (failedCards) {
-        const remaining = failedCards.cards.filter(c => !c.toLowerCase().includes(manualAddForm.name.toLowerCase()))
-        const noMore = remaining.length === 0 && (failedCards.fuzzyCards?.length ?? 0) === 0
-        setFailedCards(noMore ? null : { ...failedCards, cards: remaining })
+        const nameLow = manualAddForm.name.toLowerCase()
+        const remaining = failedCards.cards.filter(c => !c.toLowerCase().includes(nameLow))
+        // For fuzzy cards the first || segment is the CSV name
+        const remainingFuzzy = failedCards.fuzzyCards?.filter(c => !c.split('||')[0].toLowerCase().includes(nameLow)) ?? []
+        const noMore = remaining.length === 0 && remainingFuzzy.length === 0
+        setFailedCards(noMore ? null : { ...failedCards, cards: remaining, fuzzyCards: remainingFuzzy })
       }
 
       setToast({ message: `${manualAddForm.name} added to deck!`, type: 'success' })
@@ -1216,28 +1220,33 @@ function InventoryPage() {
             {failedCards.fuzzyCards && failedCards.fuzzyCards.length > 0 && (
               <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4">
                 <p className="text-yellow-800 font-bold text-sm mb-1">
-                  🇯🇵 {failedCards.fuzzyCards.length} card{failedCards.fuzzyCards.length !== 1 ? 's were' : ' was'} imported with an inexact match — please verify or edit:
+                  🇯🇵 {failedCards.fuzzyCards.length} card{failedCards.fuzzyCards.length !== 1 ? 's were' : ' was'} not imported — inexact or Japanese match, add manually:
                 </p>
-                <p className="text-yellow-700 text-xs mb-3">These cards may be Japanese versions or alternate printings that could not be matched exactly. The closest card was imported — use the Edit button on the row to correct name, image, or number.</p>
+                <p className="text-yellow-700 text-xs mb-3">These cards may be Japanese versions or alternate printings. The database has a similar-named card but it wasn't an exact match, so they were not imported automatically.</p>
                 <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                   {failedCards.fuzzyCards.map((card, i) => {
-                    // Format: "Card Name (num) - Set → matched as 'X' [label]"
-                    const arrowIdx = card.indexOf(' → matched as ')
-                    const original = arrowIdx !== -1 ? card.slice(0, arrowIdx) : card
-                    const matched  = arrowIdx !== -1 ? card.slice(arrowIdx + 14) : ''
+                    // Format: "csvName||csvNumber||csvSet||matchedName||label"
+                    const parts = card.split('||')
+                    const csvName    = parts[0] ?? ''
+                    const csvNumber  = parts[1] ?? ''
+                    const csvSet     = parts[2] ?? ''
+                    const matchedName = parts[3] ?? ''
+                    const label      = parts[4] ?? 'Inexact match'
                     return (
                       <div key={i} className="flex items-start gap-3">
                         <div className="flex-1 min-w-0">
-                          <div className="text-yellow-800 text-xs font-bold truncate">CSV: {original}</div>
-                          {matched && <div className="text-yellow-600 text-xs truncate">Matched: {matched}</div>}
+                          <div className="text-yellow-800 text-xs font-bold truncate">CSV: {csvName} ({csvNumber}) — {csvSet}</div>
+                          {matchedName && <div className="text-yellow-600 text-xs truncate">Closest DB match: "{matchedName}" [{label}]</div>}
                         </div>
                         <button
                           onClick={() => {
-                            setFailedCards(prev => prev ? { ...prev, fuzzyCards: prev.fuzzyCards?.filter((_, j) => j !== i) } : prev)
+                            setManualAddForm({ name: csvName, set_name: csvSet, card_number: csvNumber, condition: 'near_mint', quantity: '1', purchase_price: '', current_price: '', notes: '' })
+                            setManualAddImage(null)
+                            setManualAddModal({ deckId: selectedDeck.id, deckName: selectedDeck.name, prefill: card })
                           }}
-                          className="flex-shrink-0 px-3 py-1.5 text-xs font-bold bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 active:scale-95 transition-all"
+                          className="flex-shrink-0 px-4 py-1.5 text-sm font-bold bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 active:scale-95 transition-all"
                         >
-                          Dismiss
+                          Add
                         </button>
                       </div>
                     )
@@ -1433,6 +1442,7 @@ function InventoryPage() {
                       <button
                         onClick={() => {
                           setEditItem(item)
+                          setEditImage(null)
                           setEditForm({
                             condition: item.condition,
                             quantity: String(item.quantity),
@@ -1602,6 +1612,7 @@ function InventoryPage() {
                         <button
                           onClick={() => {
                             setEditItem(item)
+                            setEditImage(null)
                             setEditForm({
                               condition: item.condition,
                               quantity: String(item.quantity),
@@ -2064,19 +2075,34 @@ function InventoryPage() {
                 />
               </div>
 
-              {/* Image URL */}
+              {/* Image */}
               <div>
-                <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Image URL</label>
-                {editForm.card_image && (
-                  <img src={editForm.card_image} alt="Preview" className="w-20 h-28 object-contain rounded-lg mb-2 bg-gray-100 border border-gray-200" />
+                <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Card Image</label>
+                {/* Preview: new file takes priority, else existing URL */}
+                {(editImage || editForm.card_image) && (
+                  <img
+                    src={editImage ? URL.createObjectURL(editImage) : editForm.card_image}
+                    alt="Preview"
+                    className="w-20 h-28 object-contain rounded-lg mb-2 bg-gray-100 border border-gray-200"
+                  />
                 )}
-                <input
-                  type="text"
-                  placeholder="https://…"
-                  value={editForm.card_image}
-                  onChange={e => setEditForm(f => ({ ...f, card_image: e.target.value }))}
-                  className="w-full h-10 px-3 rounded-lg border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-medium"
-                />
+                <label className="flex items-center gap-3 cursor-pointer border-2 border-dashed border-gray-200 hover:border-blue-400 rounded-lg px-3 py-2 transition-colors group">
+                  <Upload className="w-4 h-4 text-gray-400 group-hover:text-blue-400 flex-shrink-0" />
+                  <span className="text-sm text-gray-500 group-hover:text-blue-500 truncate">
+                    {editImage ? editImage.name : 'Upload new image…'}
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={e => setEditImage(e.target.files?.[0] ?? null)}
+                  />
+                </label>
+                {editImage && (
+                  <button onClick={() => setEditImage(null)} className="mt-1 text-xs text-red-500 hover:underline">
+                    Remove
+                  </button>
+                )}
               </div>
 
               {/* Rarity + Type */}
@@ -2227,10 +2253,22 @@ function InventoryPage() {
                       await apiClient.patch(`/cards/${editItem.card_detail.id}/`, {
                         name: editForm.card_name,
                         card_number: editForm.card_number,
-                        image: editForm.card_image || null,
                         rarity: editForm.card_rarity,
                         card_type: editForm.card_type,
                       })
+                      // Upload image file if one was selected
+                      if (editImage) {
+                        const imgForm = new FormData()
+                        imgForm.append('image', editImage)
+                        const imgRes = await apiClient.post(
+                          `/cards/${editItem.card_detail.id}/upload-image/`,
+                          imgForm,
+                          { headers: { 'Content-Type': 'multipart/form-data' } }
+                        )
+                        // Update local card_image with the new URL returned
+                        const newImageUrl = imgRes.data?.image_url || imgRes.data?.image || editForm.card_image
+                        setEditForm(f => ({ ...f, card_image: newImageUrl ?? '' }))
+                      }
                     }
                     // PATCH inventory item
                     await apiClient.patch(`/inventory/${editItem.id}/`, {
@@ -2265,6 +2303,7 @@ function InventoryPage() {
                         : i
                     ))
                     setEditItem(null)
+                    setEditImage(null)
                     setToast({ message: 'Card updated', type: 'success' })
                   } catch (err) {
                     console.error('Error updating card:', err)

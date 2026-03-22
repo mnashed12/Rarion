@@ -182,10 +182,6 @@ class CardViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Delete old image if exists
-        if card.image:
-            card.image.delete(save=False)
-        
         card.image = request.FILES['image']
         card.save()
         
@@ -1074,12 +1070,14 @@ class DeckViewSet(viewsets.ModelViewSet):
                     _is_jp = '(jp)' in card_name.lower() or 'japanese' in set_name.lower()
                     _label = 'Japanese card' if _is_jp else 'Inexact match'
                     fuzzy_match_cards.append(
-                        f"{card_name} ({card_number}) - {set_name} → matched as '{card.name}' [{_label}]"
+                        f"{card_name}||{card_number}||{set_name}||{card.name}||{_label}"
                     )
                     logger.warning(
-                        f'[import_csv] Fuzzy match ({_label}): "{card_name}" → "{card.name}" '
+                        f'[import_csv] Fuzzy/skipped ({_label}): "{card_name}" → "{card.name}" '
                         f'#{card_number} set="{set_name}"'
                     )
+                    not_found += 1
+                    continue
 
                 new_item = InventoryItem(
                     card=card,
