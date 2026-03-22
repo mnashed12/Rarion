@@ -2144,10 +2144,14 @@ function InventoryPage() {
             {carouselCards.some(c => c.prestige === 'rarion' || c.prestige === 'cosmos') && (
               <div className="mb-6">
                 <p className="text-white/40 text-xs font-bold uppercase tracking-widest mb-3 px-1">✦ Rarion &amp; Cosmos</p>
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
-                  {carouselCards.filter(c => c.prestige === 'rarion' || c.prestige === 'cosmos').map((item) => (
-                    <CarouselCard key={item.id} item={item} isFaded={fadedCards.has(item.id)} />
-                  ))}
+                <div className="overflow-x-auto pb-2">
+                  <div className="flex gap-3" style={{ width: 'max-content' }}>
+                    {carouselCards.filter(c => c.prestige === 'rarion' || c.prestige === 'cosmos').map((item) => (
+                      <div key={item.id} className="flex-shrink-0 w-40">
+                        <CarouselCard item={item} isFaded={fadedCards.has(item.id)} />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
@@ -2155,10 +2159,14 @@ function InventoryPage() {
             {carouselCards.some(c => c.prestige !== 'rarion' && c.prestige !== 'cosmos') && (
               <div>
                 <p className="text-white/40 text-xs font-bold uppercase tracking-widest mb-3 px-1">★ Galaxy &amp; Star</p>
-                <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2">
-                  {carouselCards.filter(c => c.prestige !== 'rarion' && c.prestige !== 'cosmos').map((item) => (
-                    <CarouselCard key={item.id} item={item} isFaded={fadedCards.has(item.id)} />
-                  ))}
+                <div className="overflow-x-auto pb-2">
+                  <div className="flex gap-2" style={{ width: 'max-content' }}>
+                    {carouselCards.filter(c => c.prestige !== 'rarion' && c.prestige !== 'cosmos').map((item) => (
+                      <div key={item.id} className="flex-shrink-0 w-28">
+                        <CarouselCard item={item} isFaded={fadedCards.has(item.id)} />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}

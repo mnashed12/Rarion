@@ -474,8 +474,10 @@ export default function DecksPage() {
                       <div className="flex-1 h-px" style={{ background: tier.condBorder }} />
                     </div>
 
-                    <div className="flex flex-wrap gap-3">
-                      {cards.map((item, idx) => renderInventoryCard(item, idx, true))}
+                    <div className="overflow-x-auto pb-2">
+                      <div className="flex gap-3" style={{ width: 'max-content' }}>
+                        {cards.map((item, idx) => renderInventoryCard(item, idx, true))}
+                      </div>
                     </div>
                   </div>
                 )
@@ -496,8 +498,10 @@ export default function DecksPage() {
                       </span>
                       <div className="flex-1 h-px bg-white/10" />
                     </div>
-                    <div className="flex flex-wrap gap-3">
-                      {cards.map((item, idx) => renderInventoryCard(item, idx, true))}
+                    <div className="overflow-x-auto pb-2">
+                      <div className="flex gap-3" style={{ width: 'max-content' }}>
+                        {cards.map((item, idx) => renderInventoryCard(item, idx, true))}
+                      </div>
                     </div>
                   </div>
                 )
