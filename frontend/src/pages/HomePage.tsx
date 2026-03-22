@@ -62,92 +62,100 @@ function PullNotification({ item, onDone }: PullNotifProps) {
   const cfg = PRESTIGE_CONFIG[item.prestige] ?? PRESTIGE_CONFIG.star
 
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase('show'), 50)   // let 'in' render first
-    const t2 = setTimeout(() => setPhase('out'),  4500)
-    const t3 = setTimeout(() => onDone(),          5200)
+    const t1 = setTimeout(() => setPhase('show'), 30)
+    const t2 = setTimeout(() => setPhase('out'),  5500)
+    const t3 = setTimeout(() => onDone(),          6400)
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
   }, [])
 
-  const translateY = phase === 'in' ? '100%' : phase === 'out' ? '120%' : '0%'
-  const opacity    = phase === 'show' ? 1 : 0
+  const cardScale      = phase === 'in' ? 0.4 : phase === 'out' ? 0.3 : 1
+  const cardOpacity    = phase === 'show' ? 1 : 0
+  const cardY          = phase === 'in' ? '60px' : phase === 'out' ? '-40px' : '0px'
 
   return (
     <div
-      className="fixed bottom-8 left-1/2 z-[9999] pointer-events-none"
+      className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none"
       style={{
-        transform:    `translateX(-50%) translateY(${translateY})`,
-        opacity,
-        transition:   'transform 0.55s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s ease',
-        width:        'min(480px, 92vw)',
+        background: phase === 'show' ? 'rgba(0,0,0,0.82)' : 'rgba(0,0,0,0)',
+        transition: 'background 0.45s ease',
+        backdropFilter: phase === 'show' ? 'blur(8px)' : 'blur(0px)',
       }}
     >
-      {/* Card shell */}
       <div
-        className="relative rounded-2xl overflow-hidden flex items-center gap-4 p-4"
         style={{
-          background:   'linear-gradient(135deg, rgba(15,10,40,0.97) 0%, rgba(30,20,60,0.97) 100%)',
-          border:       `2px solid ${cfg.border}`,
-          boxShadow:    `0 0 40px ${cfg.glow}, 0 20px 60px rgba(0,0,0,0.7)`,
-          backdropFilter: 'blur(20px)',
+          opacity:    cardOpacity,
+          transform:  `scale(${cardScale}) translateY(${cardY})`,
+          transition: 'opacity 0.45s ease, transform 0.55s cubic-bezier(0.34,1.4,0.64,1)',
+          width: 'min(420px, 88vw)',
         }}
       >
-        {/* Animated shimmer sweep */}
+        {/* Glow halo behind the card */}
         <div
-          className="absolute inset-0 pointer-events-none"
+          className="absolute inset-0 rounded-3xl blur-3xl opacity-60 pointer-events-none -z-10"
           style={{
-            background: `linear-gradient(105deg, transparent 30%, ${cfg.glow} 50%, transparent 70%)`,
-            animation:  'shimmer-sweep 1.8s ease-out forwards',
+            background: `radial-gradient(ellipse at center, ${cfg.glow} 0%, transparent 70%)`,
+            transform: 'scale(1.6)',
           }}
         />
 
-        {/* Card thumbnail */}
         <div
-          className="relative flex-shrink-0 rounded-xl overflow-hidden"
+          className="relative rounded-3xl overflow-hidden"
           style={{
-            width: '70px',
-            aspectRatio: '2.5/3.5',
-            boxShadow: `0 0 20px ${cfg.glow}`,
-            border: `2px solid ${cfg.border}`,
+            background: 'linear-gradient(160deg, rgba(10,6,30,0.98) 0%, rgba(20,12,50,0.98) 100%)',
+            border: `2.5px solid ${cfg.border}`,
+            boxShadow: `0 0 60px ${cfg.glow}, 0 30px 80px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.08)`,
           }}
         >
-          {item.card_detail?.image ? (
-            <img
-              src={item.card_detail.image}
-              alt={item.card_detail.name}
-              className="w-full h-full object-contain"
-            />
-          ) : (
-            <div className="w-full h-full bg-slate-800 flex items-center justify-center">
-              <Package className="w-6 h-6 text-slate-500" />
-            </div>
-          )}
-        </div>
+          {/* Shimmer sweep */}
+          <div
+            className="absolute inset-0 pointer-events-none z-10"
+            style={{
+              background: `linear-gradient(110deg, transparent 20%, ${cfg.glow} 50%, transparent 80%)`,
+              animation: 'shimmer-sweep 1.6s ease-out forwards',
+            }}
+          />
 
-        {/* Text */}
-        <div className="flex-1 min-w-0 relative z-10">
-          {/* Top label */}
-          <div className="flex items-center gap-2 mb-1">
-            <Sparkles className="w-3.5 h-3.5 flex-shrink-0" style={{ color: cfg.border }} />
-            <span className="text-[11px] font-black tracking-widest uppercase" style={{ color: cfg.border }}>
+          {/* JUST PULLED label */}
+          <div className="flex items-center justify-center gap-2 pt-5 pb-3">
+            <Sparkles className="w-4 h-4" style={{ color: cfg.border }} />
+            <span className="text-xs font-black tracking-[0.3em] uppercase" style={{ color: cfg.border }}>
               just pulled
             </span>
+            <Sparkles className="w-4 h-4" style={{ color: cfg.border }} />
           </div>
 
-          {/* Card name */}
-          <p className="text-white font-black text-lg leading-tight truncate">
-            {item.card_detail?.name || 'Unknown Card'}
-          </p>
+          {/* Card image — large and centred */}
+          <div className="flex justify-center px-8">
+            <div
+              className="relative rounded-2xl overflow-hidden"
+              style={{
+                width: '75%',
+                aspectRatio: '2.5/3.5',
+                boxShadow: `0 0 40px ${cfg.glow}, 0 16px 48px rgba(0,0,0,0.8)`,
+                border: `2px solid ${cfg.border}`,
+              }}
+            >
+              {item.card_detail?.image ? (
+                <img src={item.card_detail.image} alt={item.card_detail.name} className="w-full h-full object-contain" />
+              ) : (
+                <div className="w-full h-full bg-slate-800 flex items-center justify-center">
+                  <Package className="w-16 h-16 text-slate-500" />
+                </div>
+              )}
+            </div>
+          </div>
 
-          {/* Set + prestige badge row */}
-          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+          {/* Card name + set + prestige */}
+          <div className="text-center px-6 pt-4 pb-6">
+            <p className="text-white font-black text-2xl leading-tight mb-1">
+              {item.card_detail?.name || 'Unknown Card'}
+            </p>
             {item.card_detail?.set_name && (
-              <span className="text-white/40 text-[11px] font-semibold truncate max-w-[180px]">
-                {item.card_detail.set_name}
-              </span>
+              <p className="text-white/40 text-sm font-semibold mb-3">{item.card_detail.set_name}</p>
             )}
             <span
-              className="text-[11px] font-black px-2 py-0.5 rounded-full text-white flex-shrink-0"
-              style={{ background: cfg.badge }}
+              className="inline-block text-sm font-black px-4 py-1.5 rounded-full text-white"
+              style={{ background: cfg.badge, boxShadow: `0 4px 16px ${cfg.glow}` }}
             >
               {cfg.sym} {cfg.label}
             </span>

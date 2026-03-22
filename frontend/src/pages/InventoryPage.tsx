@@ -76,71 +76,100 @@ function PullNotification({ item, onDone }: { item: InventoryItem; onDone: () =>
   const cfg = PRESTIGE_CONFIG[item.prestige] ?? PRESTIGE_CONFIG.star
 
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase('show'), 50)
-    const t2 = setTimeout(() => setPhase('out'),  4500)
-    const t3 = setTimeout(() => onDone(),          5200)
+    const t1 = setTimeout(() => setPhase('show'), 30)
+    const t2 = setTimeout(() => setPhase('out'),  5500)
+    const t3 = setTimeout(() => onDone(),          6400)
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
   }, [])
 
-  const translateY = phase === 'in' ? '100%' : phase === 'out' ? '120%' : '0%'
-  const opacity    = phase === 'show' ? 1 : 0
+  const cardScale      = phase === 'in' ? 0.4 : phase === 'out' ? 0.3 : 1
+  const cardOpacity    = phase === 'show' ? 1 : 0
+  const cardY          = phase === 'in' ? '60px' : phase === 'out' ? '-40px' : '0px'
 
   return (
     <div
-      className="fixed bottom-8 left-1/2 z-[9999] pointer-events-none"
+      className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none"
       style={{
-        transform:  `translateX(-50%) translateY(${translateY})`,
-        opacity,
-        transition: 'transform 0.55s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s ease',
-        width:      'min(480px, 92vw)',
+        background: phase === 'show' ? 'rgba(0,0,0,0.82)' : 'rgba(0,0,0,0)',
+        transition: 'background 0.45s ease',
+        backdropFilter: phase === 'show' ? 'blur(8px)' : 'blur(0px)',
       }}
     >
       <div
-        className="relative rounded-2xl overflow-hidden flex items-center gap-4 p-4"
         style={{
-          background:     'linear-gradient(135deg, rgba(15,10,40,0.97) 0%, rgba(30,20,60,0.97) 100%)',
-          border:         `2px solid ${cfg.border}`,
-          boxShadow:      `0 0 40px ${cfg.glow}, 0 20px 60px rgba(0,0,0,0.7)`,
-          backdropFilter: 'blur(20px)',
+          opacity:    cardOpacity,
+          transform:  `scale(${cardScale}) translateY(${cardY})`,
+          transition: 'opacity 0.45s ease, transform 0.55s cubic-bezier(0.34,1.4,0.64,1)',
+          width: 'min(420px, 88vw)',
         }}
       >
-        {/* Shimmer sweep */}
+        {/* Glow halo */}
         <div
-          className="absolute inset-0 pointer-events-none"
+          className="absolute inset-0 rounded-3xl blur-3xl opacity-60 pointer-events-none -z-10"
           style={{
-            background: `linear-gradient(105deg, transparent 30%, ${cfg.glow} 50%, transparent 70%)`,
-            animation:  'shimmer-sweep 1.8s ease-out forwards',
+            background: `radial-gradient(ellipse at center, ${cfg.glow} 0%, transparent 70%)`,
+            transform: 'scale(1.6)',
           }}
         />
-        {/* Card thumbnail */}
+
         <div
-          className="relative flex-shrink-0 rounded-xl overflow-hidden"
-          style={{ width: '70px', aspectRatio: '2.5/3.5', boxShadow: `0 0 20px ${cfg.glow}`, border: `2px solid ${cfg.border}` }}
+          className="relative rounded-3xl overflow-hidden"
+          style={{
+            background: 'linear-gradient(160deg, rgba(10,6,30,0.98) 0%, rgba(20,12,50,0.98) 100%)',
+            border: `2.5px solid ${cfg.border}`,
+            boxShadow: `0 0 60px ${cfg.glow}, 0 30px 80px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.08)`,
+          }}
         >
-          {item.card_detail?.image ? (
-            <img src={item.card_detail.image} alt={item.card_detail.name} className="w-full h-full object-contain" />
-          ) : (
-            <div className="w-full h-full bg-slate-800 flex items-center justify-center">
-              <Package className="w-6 h-6 text-slate-500" />
-            </div>
-          )}
-        </div>
-        {/* Text */}
-        <div className="flex-1 min-w-0 relative z-10">
-          <div className="flex items-center gap-2 mb-1">
-            <Sparkles className="w-3.5 h-3.5 flex-shrink-0" style={{ color: cfg.border }} />
-            <span className="text-[11px] font-black tracking-widest uppercase" style={{ color: cfg.border }}>just pulled</span>
+          {/* Shimmer sweep */}
+          <div
+            className="absolute inset-0 pointer-events-none z-10"
+            style={{
+              background: `linear-gradient(110deg, transparent 20%, ${cfg.glow} 50%, transparent 80%)`,
+              animation: 'shimmer-sweep 1.6s ease-out forwards',
+            }}
+          />
+
+          {/* JUST PULLED label */}
+          <div className="flex items-center justify-center gap-2 pt-5 pb-3">
+            <Sparkles className="w-4 h-4" style={{ color: cfg.border }} />
+            <span className="text-xs font-black tracking-[0.3em] uppercase" style={{ color: cfg.border }}>
+              just pulled
+            </span>
+            <Sparkles className="w-4 h-4" style={{ color: cfg.border }} />
           </div>
-          <p className="text-white font-black text-lg leading-tight truncate">
-            {item.card_detail?.name || 'Unknown Card'}
-          </p>
-          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+
+          {/* Card image — large and centred */}
+          <div className="flex justify-center px-8">
+            <div
+              className="relative rounded-2xl overflow-hidden"
+              style={{
+                width: '75%',
+                aspectRatio: '2.5/3.5',
+                boxShadow: `0 0 40px ${cfg.glow}, 0 16px 48px rgba(0,0,0,0.8)`,
+                border: `2px solid ${cfg.border}`,
+              }}
+            >
+              {item.card_detail?.image ? (
+                <img src={item.card_detail.image} alt={item.card_detail?.name || 'Card'} className="w-full h-full object-contain" />
+              ) : (
+                <div className="w-full h-full bg-slate-800 flex items-center justify-center">
+                  <Package className="w-16 h-16 text-slate-500" />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Card name + set + prestige */}
+          <div className="text-center px-6 pt-4 pb-6">
+            <p className="text-white font-black text-2xl leading-tight mb-1">
+              {item.card_detail?.name || 'Unknown Card'}
+            </p>
             {item.card_detail?.set_name && (
-              <span className="text-white/40 text-[11px] font-semibold truncate max-w-[180px]">{item.card_detail.set_name}</span>
+              <p className="text-white/40 text-sm font-semibold mb-3">{item.card_detail.set_name}</p>
             )}
             <span
-              className="text-[11px] font-black px-2 py-0.5 rounded-full text-white flex-shrink-0"
-              style={{ background: cfg.badge }}
+              className="inline-block text-sm font-black px-4 py-1.5 rounded-full text-white"
+              style={{ background: cfg.badge, boxShadow: `0 4px 16px ${cfg.glow}` }}
             >
               {cfg.sym} {cfg.label}
             </span>
@@ -225,6 +254,9 @@ function InventoryPage() {
   const [manualAddForm, setManualAddForm] = useState({ name: '', set_name: '', card_number: '', condition: 'near_mint', quantity: '1', purchase_price: '', current_price: '', notes: '' })
   const [manualAddImage, setManualAddImage] = useState<File | null>(null)
   const [manualAddLoading, setManualAddLoading] = useState(false)
+  const [editItem, setEditItem] = useState<InventoryItem | null>(null)
+  const [editForm, setEditForm] = useState({ condition: 'near_mint', quantity: '1', purchase_price: '', current_price: '', notes: '', prestige: 'star', location: '' })
+  const [editLoading, setEditLoading] = useState(false)
   const [deckModal, setDeckModal] = useState<{ mode: 'create' | 'rename'; deck?: Deck; name: string; background_image: 'PAKMAKDECK' | 'DANNYDECK' } | null>(null)
   const [_deckStats, setDeckStats] = useState<{ total_items: number; total_quantity: number; total_value: number; low_stock: number } | null>(null)
   
@@ -1386,7 +1418,20 @@ function InventoryPage() {
                       ${parseFloat(item.current_price as any || 0).toFixed(2)}
                     </span>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
+                      <button
+                        onClick={() => {
+                          setEditItem(item)
+                          setEditForm({
+                            condition: item.condition,
+                            quantity: String(item.quantity),
+                            purchase_price: item.purchase_price ?? '',
+                            current_price: item.current_price ?? '',
+                            notes: item.notes ?? '',
+                            prestige: item.prestige,
+                            location: item.location ?? '',
+                          })
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
@@ -1537,7 +1582,20 @@ function InventoryPage() {
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                        <button
+                          onClick={() => {
+                            setEditItem(item)
+                            setEditForm({
+                              condition: item.condition,
+                              quantity: String(item.quantity),
+                              purchase_price: item.purchase_price ?? '',
+                              current_price: item.current_price ?? '',
+                              notes: item.notes ?? '',
+                              prestige: item.prestige,
+                              location: item.location ?? '',
+                            })
+                          }}
+                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button 
@@ -1937,6 +1995,166 @@ function InventoryPage() {
       )}
 
       {/* Manual Add Card Modal */}
+      {/* Edit Card Modal */}
+      {editItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div>
+                <h3 className="text-xl font-black text-gray-900">Edit Card</h3>
+                <p className="text-sm text-gray-500 mt-0.5 truncate max-w-[260px]">
+                  {editItem.card_detail?.name || 'Unknown Card'} — {editItem.card_detail?.set_name || ''}
+                </p>
+              </div>
+              <button onClick={() => setEditItem(null)} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Fields */}
+            <div className="px-6 py-4 space-y-4 max-h-[65vh] overflow-y-auto">
+              {/* Condition */}
+              <div>
+                <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Condition</label>
+                <select
+                  value={editForm.condition}
+                  onChange={e => setEditForm(f => ({ ...f, condition: e.target.value }))}
+                  className="w-full h-10 px-3 rounded-lg border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-medium"
+                >
+                  <option value="near_mint">Near Mint</option>
+                  <option value="lightly_played">Lightly Played</option>
+                  <option value="moderately_played">Moderately Played</option>
+                  <option value="heavily_played">Heavily Played</option>
+                  <option value="damaged">Damaged</option>
+                </select>
+              </div>
+
+              {/* Prestige */}
+              <div>
+                <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Prestige</label>
+                <select
+                  value={editForm.prestige}
+                  onChange={e => setEditForm(f => ({ ...f, prestige: e.target.value }))}
+                  className="w-full h-10 px-3 rounded-lg border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-medium"
+                >
+                  <option value="star">Star</option>
+                  <option value="galaxy">Galaxy</option>
+                  <option value="cosmos">Cosmos</option>
+                  <option value="rarion">Rarion</option>
+                </select>
+              </div>
+
+              {/* Quantity */}
+              <div>
+                <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Quantity</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={editForm.quantity}
+                  onChange={e => setEditForm(f => ({ ...f, quantity: e.target.value }))}
+                  className="w-full h-10 px-3 rounded-lg border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-medium"
+                />
+              </div>
+
+              {/* Prices */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Purchase Price</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={editForm.purchase_price}
+                    onChange={e => setEditForm(f => ({ ...f, purchase_price: e.target.value }))}
+                    className="w-full h-10 px-3 rounded-lg border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Current Price</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={editForm.current_price}
+                    onChange={e => setEditForm(f => ({ ...f, current_price: e.target.value }))}
+                    className="w-full h-10 px-3 rounded-lg border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-medium"
+                  />
+                </div>
+              </div>
+
+              {/* Location / Portfolio */}
+              <div>
+                <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Location / Portfolio</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Main, Batch 1"
+                  value={editForm.location}
+                  onChange={e => setEditForm(f => ({ ...f, location: e.target.value }))}
+                  className="w-full h-10 px-3 rounded-lg border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-medium"
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Notes</label>
+                <textarea
+                  rows={3}
+                  placeholder="Any notes about this card…"
+                  value={editForm.notes}
+                  onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 focus:border-blue-400 focus:outline-none text-sm font-medium resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Footer buttons */}
+            <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
+              <button
+                onClick={() => setEditItem(null)}
+                className="flex-1 px-4 py-2 rounded-lg border-2 border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={editLoading}
+                onClick={async () => {
+                  setEditLoading(true)
+                  try {
+                    await apiClient.patch(`/inventory/${editItem.id}/`, {
+                      condition: editForm.condition,
+                      prestige: editForm.prestige,
+                      quantity: parseInt(editForm.quantity) || 0,
+                      purchase_price: editForm.purchase_price || null,
+                      current_price: editForm.current_price || null,
+                      notes: editForm.notes,
+                      location: editForm.location,
+                    })
+                    setInventory(prev => prev.map(i =>
+                      i.id === editItem.id
+                        ? { ...i, condition: editForm.condition as InventoryItem['condition'], prestige: editForm.prestige, quantity: parseInt(editForm.quantity) || 0, purchase_price: editForm.purchase_price || null, current_price: editForm.current_price || null, notes: editForm.notes, location: editForm.location }
+                        : i
+                    ))
+                    setEditItem(null)
+                    setToast({ message: 'Card updated', type: 'success' })
+                  } catch (err) {
+                    console.error('Error updating card:', err)
+                    setToast({ message: 'Failed to update card', type: 'error' })
+                  } finally {
+                    setEditLoading(false)
+                  }
+                }}
+                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+              >
+                {editLoading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Saving…</> : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {manualAddModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center animate-fade-in">
           <div className="bg-white rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
