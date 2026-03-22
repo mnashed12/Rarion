@@ -224,7 +224,7 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         owner = _get_request_owner(self.request)
-        qs = InventoryItem.objects.select_related('card', 'card__pokemon_set').all()
+        qs = InventoryItem.objects.select_related('card', 'card__pokemon_set', 'deck').all()
         if owner:
             qs = qs.filter(deck__owner=owner)
         return qs

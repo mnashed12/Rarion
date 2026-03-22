@@ -177,6 +177,13 @@ class CardListSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'card_number', 'set_name', 'set_code', 'rarity', 'card_type', 'image']
 
 
+class DeckMinimalSerializer(serializers.ModelSerializer):
+    """Lightweight deck serializer — no prestige_stats queries."""
+    class Meta:
+        model = Deck
+        fields = ['id', 'name', 'background_image']
+
+
 class InventoryItemSerializer(serializers.ModelSerializer):
     """
     Serializer for InventoryItem model.
@@ -202,7 +209,7 @@ class InventoryItemSerializer(serializers.ModelSerializer):
     profit_margin = serializers.SerializerMethodField(
         help_text="Profit/loss based on purchase vs current price"
     )
-    deck = DeckSerializer(read_only=True)
+    deck = DeckMinimalSerializer(read_only=True)
     deck_id = serializers.PrimaryKeyRelatedField(
         queryset=Deck.objects.all(),
         source='deck',
