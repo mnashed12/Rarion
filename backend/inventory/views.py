@@ -285,6 +285,37 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(recent, many=True)
         return Response(serializer.data)
 
+    @action(detail=False, methods=['get'])
+    def showcase_cards(self, request):
+        """
+        Return random inventory cards for the homepage showcase strips.
+
+        Returns a random selection of high-prestige cards:
+          - rarion:  up to 40 cards  (top tier)
+          - galaxy:  up to 30 cards  (third tier)
+          - cosmos:   up to 6 cards  (second tier — intentionally few)
+
+        Only cards that have an image are included.
+        """
+        def _random_by_prestige(prestige, count):
+            return list(
+                InventoryItem.objects
+                .select_related('card', 'card__pokemon_set', 'deck')
+                .filter(prestige=prestige)
+                .exclude(card__image__isnull=True)
+                .exclude(card__image='')
+                .order_by('?')[:count]
+            )
+
+        items = (
+            _random_by_prestige('rarion', 40)
+            + _random_by_prestige('galaxy', 30)
+            + _random_by_prestige('cosmos', 6)
+        )
+
+        serializer = self.get_serializer(items, many=True)
+        return Response(serializer.data)
+
     @action(detail=False, methods=['post'])
     def auto_assign_prestige(self, request):
         """

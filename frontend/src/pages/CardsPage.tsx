@@ -442,7 +442,7 @@ function CardsPage() {
       {/* Cards Grid - Pokemon themed */}
       <div className="animate-slide-down" style={{ animationDelay: '75ms' }}>
       {loading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3 md:gap-4">
           {[...Array(12)].map((_, i) => (
             <div key={i} className="rounded-2xl overflow-hidden shadow-md">
               <div className="aspect-[2.5/3.5] skeleton rounded-2xl" />
@@ -470,7 +470,7 @@ function CardsPage() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3 md:gap-4">
           {cards.map((card) => {
             const rarityStyle = getRarityStyle(card.rarity)
             const isRare = rarityStyle.glow
@@ -519,6 +519,15 @@ function CardsPage() {
                           />
                         </div>
                       )}
+
+                      {/* Mobile-only: always-visible Add bar — desktop uses card flip */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openAddToInventory(card) }}
+                        className="md:hidden absolute bottom-0 left-0 right-0 z-20 py-1.5 bg-gradient-to-r from-blue-600/90 to-blue-700/90 backdrop-blur-sm text-white text-[11px] font-black tracking-wide flex items-center justify-center gap-1 active:from-blue-700/90 active:to-blue-800/90 transition-all"
+                      >
+                        <Plus className="w-3 h-3" />
+                        Add
+                      </button>
                     </div>
                   </div>
 

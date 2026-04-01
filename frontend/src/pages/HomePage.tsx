@@ -171,16 +171,17 @@ function PullNotification({ item, onDone }: PullNotifProps) {
 interface StripProps {
   cards: InventoryItem[]
   direction: 'left' | 'right'
-  rowHeight: string
+  /** flex-grow weight — strips fill available height proportionally */
+  grow: number
   align?: 'start' | 'center' | 'end'
 }
 
-function CardStrip({ cards, direction, rowHeight, align = 'center' }: StripProps) {
+function CardStrip({ cards, direction, grow, align = 'center' }: StripProps) {
   if (cards.length === 0) {
     return (
       <div
-        className="flex items-center justify-center overflow-hidden flex-shrink-0"
-        style={{ height: rowHeight }}
+        className="flex items-center justify-center overflow-hidden"
+        style={{ flexGrow: grow, flexShrink: 1, flexBasis: 0, minHeight: 0 }}
       >
         <p className="text-white/15 text-xs font-bold tracking-widest uppercase">no cards</p>
       </div>
@@ -190,7 +191,7 @@ function CardStrip({ cards, direction, rowHeight, align = 'center' }: StripProps
   const repsPerHalf = Math.max(2, Math.ceil(30 / cards.length))
   const half  = Array.from({ length: repsPerHalf }, () => cards).flat()
   const track = [...half, ...half]
-  const speed = rowHeight === '38%' ? half.length * 9 : half.length * 7
+  const speed = grow >= 35 ? half.length * 9 : half.length * 7
   const anim  = direction === 'left'
     ? `scroll-left ${speed}s linear infinite`
     : `scroll-right ${speed}s linear infinite`
@@ -198,8 +199,8 @@ function CardStrip({ cards, direction, rowHeight, align = 'center' }: StripProps
   const alignClass = align === 'start' ? 'items-start' : align === 'end' ? 'items-end' : 'items-center'
 
   return (
-    <div className="overflow-hidden flex-shrink-0 w-full" style={{ height: rowHeight }}>
-      <div className={`flex gap-4 h-full ${alignClass}`} style={{ animation: anim, width: 'max-content' }}>
+    <div className="overflow-hidden w-full" style={{ flexGrow: grow, flexShrink: 1, flexBasis: 0, minHeight: 0 }}>
+      <div className={`flex gap-2 sm:gap-4 h-full ${alignClass}`} style={{ animation: anim, width: 'max-content' }}>
         {track.map((item, idx) => (
           <div
             key={`${item.id}-${idx}`}
@@ -236,7 +237,7 @@ function HomePage() {
   const seenIds = useRef<Set<number>>(new Set())
   const initialized = useRef(false)
 
-  const { data: recentCards = [], isLoading, isError, error } = useQuery<InventoryItem[]>({
+  const { data: recentCards = [], isLoading: recentLoading, isError, error } = useQuery<InventoryItem[]>({
     queryKey: ['recent-scans'],
     queryFn: async () => {
       const response = await apiClient.get('/inventory/recent_scans/?limit=100')
@@ -245,6 +246,18 @@ function HomePage() {
     refetchInterval: 4000,
     retry: 1,
   })
+
+  const { data: showcaseCards = [], isLoading: showcaseLoading } = useQuery<InventoryItem[]>({
+    queryKey: ['showcase-cards'],
+    queryFn: async () => {
+      const response = await apiClient.get('/inventory/showcase_cards/')
+      return response.data
+    },
+    staleTime: 5 * 60 * 1000,   // re-fetch every 5 min so the random set refreshes
+    retry: 1,
+  })
+
+  const isLoading = recentLoading && showcaseLoading
 
   // Detect newly added cards — skip the very first load
   useEffect(() => {
@@ -275,53 +288,44 @@ function HomePage() {
     return (
       <div className="fixed inset-0 z-40 flex items-center justify-center" style={bgStyle}>
         <div className="absolute inset-0 bg-black/60" />
-        <div className="relative text-white/60 text-lg animate-pulse">Loading recent scans...</div>
+        <div className="relative text-white/60 text-lg animate-pulse">Loading...</div>
       </div>
     )
   }
 
-  if (isError) {
+  if (isError && showcaseCards.length === 0) {
     return (
       <div className="fixed inset-0 z-40 flex items-center justify-center" style={bgStyle}>
         <div className="absolute inset-0 bg-black/60" />
         <div className="relative text-center">
           <Package className="w-16 h-16 text-red-400/60 mx-auto mb-4" />
-          <p className="text-red-400 text-lg">Failed to load recent scans</p>
+          <p className="text-red-400 text-lg">Failed to load cards</p>
           <p className="text-white/30 text-sm mt-2 font-mono">{String((error as any)?.message || error)}</p>
         </div>
       </div>
     )
   }
 
-  if (recentCards.length === 0) {
-    return (
-      <div className="fixed inset-0 z-40 flex items-center justify-center" style={bgStyle}>
-        <div className="absolute inset-0 bg-black/60" />
-        <div className="relative text-center">
-          <Package className="w-16 h-16 text-white/20 mx-auto mb-4" />
-          <p className="text-white/40 text-lg">No recently scanned cards</p>
-          <p className="text-white/20 text-sm mt-2">Scan cards via QR to see them here</p>
-        </div>
-      </div>
-    )
-  }
-
   const visibleCards = recentCards.filter(c => !hiddenIds.has(c.id))
-  const rarionCards = visibleCards.filter(c => c.prestige === 'rarion')
-  const cosmosCards = visibleCards.filter(c => c.prestige === 'cosmos')
-  const otherCards  = visibleCards.filter(c => c.prestige !== 'rarion' && c.prestige !== 'cosmos')
+
+  // Build strip data from showcase cards (random high-prestige selection),
+  // falling back to recent cards if showcase hasn't loaded yet.
+  const stripSource = showcaseCards.length > 0 ? showcaseCards : visibleCards
+  const rarionCards = stripSource.filter(c => c.prestige === 'rarion')
+  const cosmosCards = stripSource.filter(c => c.prestige === 'cosmos')
+  const galaxyCards = stripSource.filter(c => c.prestige === 'galaxy')
 
   return (
     <>
       <div className="fixed inset-0 z-40 overflow-hidden flex flex-col" style={bgStyle}>
         <div className="absolute inset-0 bg-black/50" />
-        <div className="relative z-10 flex flex-col h-full pt-20 sm:pt-24">
-          <CardStrip cards={rarionCards} direction="left"  rowHeight="38%" align="end" />
+        <div className="relative z-10 flex flex-col h-full pt-20 sm:pt-24 pb-16 md:pb-0">
+          <CardStrip cards={rarionCards} direction="left"  grow={38} align="end" />
           {/* Recently Pulled heading */}
-          <div className="flex items-center justify-center gap-5">
-            <span className="block h-px w-20 sm:w-32 bg-gradient-to-r from-transparent to-white/30" />
+          <div className="flex items-center justify-center gap-3 sm:gap-5 flex-shrink-0 py-0.5 sm:py-0">
+            <span className="block h-px w-12 sm:w-32 bg-gradient-to-r from-transparent to-white/30" />
             <span
-              className="text-2xl sm:text-4xl font-black tracking-[0.2em] uppercase whitespace-nowrap"
+              className="text-base sm:text-2xl lg:text-4xl font-black tracking-[0.12em] sm:tracking-[0.2em] uppercase whitespace-nowrap"
               style={{
                 background: 'linear-gradient(90deg, #fb923c 0%, #c084fc 50%, #60a5fa 100%)',
                 WebkitBackgroundClip: 'text',
@@ -332,14 +336,14 @@ function HomePage() {
             >
               Recently Pulled
             </span>
-            <span className="block h-px w-20 sm:w-32 bg-gradient-to-l from-transparent to-white/30" />
+            <span className="block h-px w-12 sm:w-32 bg-gradient-to-l from-transparent to-white/30" />
           </div>
-          <CardStrip cards={cosmosCards} direction="right" rowHeight="31%" align="end" />
-          <CardStrip cards={otherCards}  direction="left"  rowHeight="31%" align="start" />
+          <CardStrip cards={cosmosCards} direction="right" grow={28} align="end" />
+          <CardStrip cards={galaxyCards} direction="left"  grow={28} align="start" />
         </div>
 
-        {/* Footer — floats above cards in the empty bottom space */}
-        <div className="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-between px-5 py-2.5">
+        {/* Footer — sits in the bottom padding gap, above mobile nav */}
+        <div className="absolute bottom-16 md:bottom-0 left-0 right-0 z-20 flex items-center justify-between px-5 py-2.5">
           {/* Left: logo + copyright */}
           <div className="flex items-center gap-2.5">
             <img src="/images/RarionLogoPlainnobg.png" alt="Rarion" className="h-4 w-auto opacity-50" />
