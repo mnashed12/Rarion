@@ -77,7 +77,7 @@ html {
   html.no-doc-scroll-mobile body {
     overflow: hidden !important;
     height: 100dvh !important;
-    touch-action: none;
+    min-height: 0 !important;
   }
 }
 

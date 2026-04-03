@@ -520,4 +520,4 @@ import{j as o,u as Us,a as Na,Q as va,b as Ia}from"./query-CXdMrQ3Y.js";import{a
           80%       { transform: translateX(5px); }
         }
       `})]})}function Cc(){return o.jsxs(Vs,{children:[o.jsx(ur,{path:"/mx",element:o.jsx(yc,{})}),o.jsx(ur,{path:"/*",element:o.jsx(Bl,{children:o.jsxs(Vs,{children:[o.jsx(ur,{path:"/",element:o.jsx(jl,{})}),o.jsx(ur,{path:"/cards",element:o.jsx(Ll,{})}),o.jsx(ur,{path:"/decks",element:o.jsx(Hl,{})}),o.jsx(ur,{path:"/inventory",element:o.jsx(bi,{children:o.jsx(gc,{})})}),o.jsx(ur,{path:"/streams",element:o.jsx(bi,{children:o.jsx(mc,{})})}),o.jsx(ur,{path:"/tos",element:o.jsx(wc,{})}),o.jsx(ur,{path:"/privacy",element:o.jsx(bc,{})}),o.jsx(ur,{path:"*",element:o.jsx(pc,{})})]})})})]})}const Ac=new va({defaultOptions:{queries:{staleTime:5*60*1e3,gcTime:30*60*1e3,retry:3,refetchOnWindowFocus:!1}}});us.createRoot(document.getElementById("root")).render(o.jsx(ka.StrictMode,{children:o.jsx(Ia,{client:Ac,children:o.jsx(Da,{children:o.jsx(kl,{children:o.jsx(Cc,{})})})})}));
-//# sourceMappingURL=index-BLVW19S-.js.map
+//# sourceMappingURL=index-C6WrurfK.js.map
