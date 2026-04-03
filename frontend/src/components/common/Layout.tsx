@@ -46,6 +46,19 @@ function Layout({ children }: LayoutProps) {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
+  // Lock document scroll on mobile for homepage and card list page
+  useEffect(() => {
+    const noScrollPages = ['/', '/decks']
+    if (noScrollPages.includes(location.pathname)) {
+      document.documentElement.classList.add('no-doc-scroll-mobile')
+    } else {
+      document.documentElement.classList.remove('no-doc-scroll-mobile')
+    }
+    return () => {
+      document.documentElement.classList.remove('no-doc-scroll-mobile')
+    }
+  }, [location.pathname])
+
   const isActivePath = (path: string) => {
     if (path === '/') return location.pathname === '/'
     return location.pathname.startsWith(path)

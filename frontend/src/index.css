@@ -72,6 +72,15 @@ html {
   overflow-x: hidden;
 }
 
+@media (max-width: 767px) {
+  html.no-doc-scroll-mobile,
+  html.no-doc-scroll-mobile body {
+    overflow: hidden !important;
+    height: 100dvh !important;
+    touch-action: none;
+  }
+}
+
 body {
   @apply text-gray-900 antialiased;
   font-family: "Flexo-Medium", arial, sans-serif;
