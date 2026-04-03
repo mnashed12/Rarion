@@ -250,7 +250,7 @@ export default function DecksPage() {
 
   // ── render ────────────────────────────────────────────────────────────
   return (
-    <div>
+    <div className="max-md:flex-1 max-md:flex max-md:flex-col max-md:overflow-hidden">
 
       {/* Fixed full-page background — stays still while content scrolls */}
       <div
@@ -267,7 +267,7 @@ export default function DecksPage() {
           COSMIC HERO
       ════════════════════════════════════════════════════════════════ */}
       <div
-        className="relative overflow-hidden px-6 sm:px-12 lg:px-20 pt-36 sm:pt-30"
+        className="relative overflow-hidden px-6 sm:px-12 lg:px-20 sm:pt-36 flex-shrink-0"
       >
         {/* Static starfield */}
         <div className="absolute inset-0 pointer-events-none">
@@ -290,7 +290,7 @@ export default function DecksPage() {
       {/* ════════════════════════════════════════════════════════════════
           MAIN CONTENT
       ════════════════════════════════════════════════════════════════ */}
-      <div className="px-4 sm:px-6 lg:px-10 xl:px-16 2xl:px-24 pb-16 space-y-8">
+      <div className="max-md:flex-1 max-md:overflow-y-auto max-md:pb-4 max-md:space-y-4 px-4 sm:px-6 lg:px-10 xl:px-16 2xl:px-24 pb-16 space-y-8">
 
         {/* ── DECK GRID ─────────────────────────────────────────────── */}
         {decks.length === 0 ? (

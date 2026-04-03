@@ -61,7 +61,7 @@ function Layout({ children }: LayoutProps) {
 
   return (
     <div
-      className="min-h-screen flex flex-col"
+      className={`${(location.pathname === '/' || location.pathname === '/decks') ? 'max-md:h-dvh max-md:min-h-0 max-md:overflow-hidden' : ''} min-h-screen flex flex-col`}
       style={location.pathname === '/inventory' ? { backgroundImage: `url(${'/images/deckbg.jpg'})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' } : undefined}
     >
       {/* Header - transparent on homepage + decks, gradient elsewhere */}
@@ -123,7 +123,7 @@ function Layout({ children }: LayoutProps) {
 
       {/* Main Content */}
       <main
-        className={`flex-1 ${location.pathname === '/decks' || location.pathname === '/inventory' ? '' : 'pb-20 md:pb-8 pokemon-content-bg'}`}
+        className={`flex-1 ${location.pathname === '/decks' || location.pathname === '/inventory' ? '' : 'pb-20 md:pb-8 pokemon-content-bg'} ${location.pathname === '/decks' ? 'max-md:flex max-md:flex-col max-md:overflow-hidden' : ''}`}
       >
         {/* Decorative pokeballs (hidden on decks/inventory — full-page bg takes over) */}
         {location.pathname !== '/decks' && location.pathname !== '/inventory' && (
