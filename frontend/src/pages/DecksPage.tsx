@@ -301,7 +301,7 @@ export default function DecksPage() {
         ) : (
           <div>
             {/* Outer scroll container — inner row centres when it fits, scrolls when it overflows */}
-            <div className="overflow-x-auto pt-4 pb-6 hide-scrollbar">
+            <div className="overflow-x-auto py-10 px-6 hide-scrollbar">
               <div className="flex gap-4 sm:gap-5 justify-center overflow-visible" style={{ minWidth: 'max-content', scrollSnapType: 'x mandatory' }}>
               {decks.map(deck => {
                 const isActive = selectedDeck?.id === deck.id
