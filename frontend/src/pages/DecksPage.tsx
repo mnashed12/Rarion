@@ -316,18 +316,19 @@ export default function DecksPage() {
                     onClick={() => setSelectedDeck(deck)}
                   >
                     {/* Depth shadow layers */}
-                    <div className="absolute inset-0 rounded-[20px] translate-y-2.5 translate-x-1 bg-black/25" />
-                    <div className="absolute inset-0 rounded-[20px] translate-y-1 bg-black/15" />
+                    <div className="absolute inset-0 translate-y-2.5 translate-x-1 bg-black/25" />
+                    <div className="absolute inset-0 translate-y-1 bg-black/15" />
 
                     {/* Card face */}
                     <div
-                      className={`card-holo relative aspect-[2.5/3.5] rounded-[20px] overflow-hidden flex flex-col transition-all duration-300 ${
+                      className={`card-holo relative aspect-[2.5/3.5] overflow-hidden flex flex-col transition-all duration-300 ${
                         isActive ? 'scale-[1.07] -rotate-1' : 'hover:scale-[1.04] hover:-translate-y-1'
                       }`}
                       style={{
                         backgroundImage: `url(${import.meta.env.BASE_URL}images/${getDeckImage(deck)})`,
-                        backgroundSize: 'cover',
+                        backgroundSize: 'contain',
                         backgroundPosition: 'center',
+                        backgroundRepeat: 'no-repeat',
                         boxShadow: isActive
                           ? '0 0 0 2.5px #a855f7, 0 0 40px rgba(168,85,247,0.5), 0 20px 40px rgba(0,0,0,0.6)'
                           : '0 12px 32px rgba(0,0,0,0.5)',
@@ -340,7 +341,7 @@ export default function DecksPage() {
 
                       {/* Active inner ring */}
                       {isActive && (
-                        <div className="absolute inset-0 rounded-[20px] pointer-events-none"
+                        <div className="absolute inset-0 pointer-events-none"
                           style={{ boxShadow: 'inset 0 0 0 2px rgba(168,85,247,0.7)' }} />
                       )}
 
