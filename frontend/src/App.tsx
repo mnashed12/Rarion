@@ -5,7 +5,6 @@ import HomePage from './pages/HomePage'
 import CardsPage from './pages/CardsPage'
 import DecksPage from './pages/DecksPage'
 import InventoryPage from './pages/InventoryPage'
-import StreamsPage from './pages/StreamsPage'
 import NotFoundPage from './pages/NotFoundPage'
 import TermsPage from './pages/TermsPage'
 import PrivacyPage from './pages/PrivacyPage'
@@ -22,7 +21,6 @@ import AdminLoginPage from './pages/AdminLoginPage'
  * - / : Home page with dashboard
  * - /cards : Card listing and management
  * - /inventory : Inventory management (password protected)
- * - /streams : Stream event management
  * - * : 404 Not Found
  */
 function App() {
@@ -46,11 +44,6 @@ function App() {
                 </InventoryProtectedRoute>
               }
             />
-            <Route path="/streams" element={
-              <InventoryProtectedRoute>
-                <StreamsPage />
-              </InventoryProtectedRoute>
-            } />
             <Route path="/tos" element={<TermsPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="*" element={<NotFoundPage />} />

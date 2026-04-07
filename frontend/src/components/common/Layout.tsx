@@ -13,7 +13,6 @@ import { useAuth } from '../../contexts/AuthContext'
 import { 
   Home, 
   Package, 
-  Video, 
   Layers,
 } from 'lucide-react'
 
@@ -29,7 +28,6 @@ const navItems = [
   // { path: '/cards', label: 'Cards', icon: CreditCard },
   { path: '/decks', label: 'Card List', icon: Layers },
   { path: '/inventory', label: 'Inventory', icon: Package },
-  { path: '/streams', label: 'Streams', icon: Video },
 ]
 
 function Layout({ children }: LayoutProps) {
@@ -66,7 +64,7 @@ function Layout({ children }: LayoutProps) {
 
   // Admin-only nav items are hidden from regular visitors
   const visibleNavItems = navItems.filter(item => {
-    if (item.path === '/inventory' || item.path === '/streams') {
+    if (item.path === '/inventory') {
       return isInventoryAuthenticated
     }
     return true
