@@ -311,7 +311,7 @@ export default function DecksPage() {
                 return (
                   <div
                     key={deck.id}
-                    className="relative cursor-pointer flex-shrink-0 w-60 sm:w-72"
+                    className="relative cursor-pointer flex-shrink-0 w-40 sm:w-60 lg:w-72"
                     style={{ scrollSnapAlign: 'start' }}
                     onClick={() => setSelectedDeck(deck)}
                   >
@@ -346,7 +346,7 @@ export default function DecksPage() {
 
                       {/* Deck name — top */}
                       <div className="absolute top-0 inset-x-0 z-10 px-4 pt-4">
-                        <p className="font-black text-2xl text-white leading-tight tracking-tight">
+                        <p className="font-black text-base sm:text-2xl text-white leading-tight tracking-tight">
                           {deck.name}
                         </p>
                       </div>
@@ -357,16 +357,16 @@ export default function DecksPage() {
                           const pct = total > 0 ? Math.round((stats?.[t.key] ?? 0) / total * 100) : 0
                           return (
                             <div key={t.key} className="flex items-center gap-3">
-                              <span className="text-[13px] font-black w-14 flex-shrink-0 leading-none" style={{ color: t.accent }}>
+                              <span className="text-[10px] sm:text-[13px] font-black w-10 sm:w-14 flex-shrink-0 leading-none" style={{ color: t.accent }}>
                                 {t.label}
                               </span>
-                              <div className="flex-1 h-3.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.15)' }}>
+                              <div className="flex-1 h-2.5 sm:h-3.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.15)' }}>
                                 <div
                                   className={`h-full rounded-full transition-all duration-700 ${t.activeBar}`}
                                   style={{ width: `${pct}%` }}
                                 />
                               </div>
-                              <span className="text-[13px] font-black w-9 text-right tabular-nums leading-none flex-shrink-0 text-white">
+                              <span className="text-[10px] sm:text-[13px] font-black w-7 sm:w-9 text-right tabular-nums leading-none flex-shrink-0 text-white">
                                 {pct}%
                               </span>
                             </div>
