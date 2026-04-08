@@ -212,6 +212,7 @@ export default function DecksPage() {
               alt={item.card_detail.name}
               className="w-full h-full object-contain"
               loading="lazy"
+              style={{ transform: 'translateZ(0)', filter: 'contrast(1.08) saturate(1.05)' }}
               onError={(e) => {
                 const target = e.currentTarget
                 target.onerror = null
