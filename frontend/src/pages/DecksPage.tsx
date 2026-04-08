@@ -5,7 +5,7 @@
  * Live prestige pull-rate display · Photo card grid
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Package,
   Search,
@@ -89,6 +89,153 @@ const STARS = Array.from({ length: 60 }, (_, i) => ({
   opacity: (0.12 + (i % 5) * 0.07).toFixed(2),
 }))
 
+// ─── card inspect overlay ───────────────────────────────────────────────────
+
+function CardInspectOverlay({ item, onClose }: { item: InventoryItem; onClose: () => void }) {
+  const cardRef               = useRef<HTMLDivElement>(null)
+  const [tilt, setTilt]       = useState({ x: 0, y: 0 })
+  const [mounted, setMounted] = useState(false)
+  const dragging              = useRef(false)
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setMounted(true))
+    document.body.style.overflow = 'hidden'
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      cancelAnimationFrame(id)
+      document.body.style.overflow = ''
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [onClose])
+
+  const getPos = (e: React.MouseEvent | React.TouchEvent) => {
+    if ('touches' in e) {
+      const t = e.touches[0] ?? e.changedTouches[0]
+      return { cx: t.clientX, cy: t.clientY }
+    }
+    return { cx: (e as React.MouseEvent).clientX, cy: (e as React.MouseEvent).clientY }
+  }
+
+  const applyTilt = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!dragging.current || !cardRef.current) return
+    const rect = cardRef.current.getBoundingClientRect()
+    const { cx, cy } = getPos(e)
+    const dx = (cx - (rect.left + rect.width  / 2)) / (rect.width  / 2)
+    const dy = (cy - (rect.top  + rect.height / 2)) / (rect.height / 2)
+    setTilt({ x: -dy * 28, y: dx * 28 })
+  }
+
+  const startDrag = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation()
+    dragging.current = true
+  }
+
+  const endDrag = () => {
+    dragging.current = false
+    setTilt({ x: 0, y: 0 })
+  }
+
+  const isSold = !!item.sold_at
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{
+        background: 'rgba(3,7,18,0.88)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+      }}
+      onClick={onClose}
+    >
+      <button
+        onClick={onClose}
+        className="absolute top-5 right-5 w-10 h-10 rounded-full flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+      >
+        <X className="w-5 h-5" />
+      </button>
+
+      {/* Perspective wrapper */}
+      <div
+        ref={cardRef}
+        className="relative touch-none select-none cursor-grab"
+        style={{
+          width: 'min(78vw, 300px)',
+          perspective: '800px',
+          opacity: mounted ? 1 : 0,
+          transform: mounted ? 'scale(1)' : 'scale(0.5)',
+          transition: 'opacity 0.3s ease, transform 0.5s cubic-bezier(0.34,1.56,0.64,1)',
+        }}
+        onClick={e => e.stopPropagation()}
+        onMouseDown={startDrag}
+        onMouseMove={applyTilt}
+        onMouseUp={endDrag}
+        onMouseLeave={endDrag}
+        onTouchStart={startDrag}
+        onTouchMove={applyTilt}
+        onTouchEnd={endDrag}
+      >
+        {/* 3-D tilt inner */}
+        <div
+          style={{
+            transformStyle: 'preserve-3d',
+            transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
+            transition: dragging.current ? 'none' : 'transform 0.6s cubic-bezier(0.23,1,0.32,1)',
+          }}
+        >
+          {/* Specular shine tracks pointer position */}
+          <div
+            className="absolute inset-0 pointer-events-none z-10"
+            style={{
+              background: `radial-gradient(circle at ${50 + tilt.y * 2}% ${50 - tilt.x * 2}%, rgba(255,255,255,0.28) 0%, transparent 58%)`,
+            }}
+          />
+
+          {item.card_detail?.image ? (
+            <img
+              src={item.card_detail.image}
+              alt={item.card_detail.name}
+              draggable={false}
+              className="w-full h-auto block"
+              style={{
+                filter: `contrast(1.1) saturate(1.08)${isSold ? ' grayscale(1) opacity(0.4)' : ''}`,
+                boxShadow: `${-tilt.y}px ${tilt.x}px 80px rgba(0,0,0,0.9), 0 0 60px rgba(168,85,247,0.3)`,
+              }}
+            />
+          ) : (
+            <div className="w-full aspect-[3/4] bg-gradient-to-br from-slate-700 to-slate-900 flex flex-col items-center justify-center gap-3">
+              <Package className="w-12 h-12 text-slate-500" />
+              <span className="text-sm font-bold text-slate-400 text-center px-4 leading-tight">
+                {item.card_detail?.name || 'Unknown'}
+              </span>
+            </div>
+          )}
+
+          {isSold && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span
+                className="text-red-500 font-black text-3xl tracking-widest rotate-[-20deg] border-4 border-red-500 px-3 py-1 rounded opacity-90"
+                style={{ textShadow: '0 2px 8px rgba(0,0,0,0.8)' }}
+              >
+                PULLED
+              </span>
+            </div>
+          )}
+        </div>
+
+        {item.card_detail?.name && (
+          <p
+            className="text-center text-white/70 font-bold text-sm mt-5 tracking-wide"
+            style={{ opacity: mounted ? 1 : 0, transition: 'opacity 0.4s ease 0.2s' }}
+          >
+            {item.card_detail.name}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── component ───────────────────────────────────────────────────────────────
 
 const TIER_ORDER = ['rarion', 'cosmos', 'galaxy', 'star'] as const
@@ -99,7 +246,8 @@ export default function DecksPage() {
   const [statsMap, setStatsMap]         = useState<StatsMap>({})
   const [inventory, setInventory]       = useState<InventoryItem[]>([])
   const [loading, setLoading]           = useState(false)
-  const [searchTerm, setSearchTerm]     = useState('')
+  const [searchTerm, setSearchTerm]       = useState('')
+  const [inspectedCard, setInspectedCard] = useState<InventoryItem | null>(null)
 
   // ── fetch decks + prestige stats (initial load) ───────────────────────
   useEffect(() => {
@@ -202,7 +350,8 @@ export default function DecksPage() {
     return (
       <div
         key={`${item.id}-${idx}`}
-        className={`relative flex-shrink-0 aspect-[3/4] ${large ? 'w-52 sm:w-60' : 'w-36'}`}
+        className={`relative flex-shrink-0 aspect-[3/4] cursor-pointer ${large ? 'w-52 sm:w-60' : 'w-36'}`}
+        onClick={() => setInspectedCard(item)}
       >
         {/* Card content — dimmed when sold */}
         <div className={`w-full h-full transition-all duration-300 ${isSold ? 'opacity-40 grayscale' : ''}`}>
@@ -513,6 +662,10 @@ export default function DecksPage() {
         )}
 
       </div>
+
+      {inspectedCard && (
+        <CardInspectOverlay item={inspectedCard} onClose={() => setInspectedCard(null)} />
+      )}
     </div>
   )
 }
