@@ -202,7 +202,7 @@ export default function DecksPage() {
     return (
       <div
         key={`${item.id}-${idx}`}
-        className={`relative flex-shrink-0 aspect-[3/4] shadow-lg ${large ? 'w-52 sm:w-60' : 'w-36'}`}
+        className={`relative flex-shrink-0 aspect-[3/4] ${large ? 'w-52 sm:w-60' : 'w-36'}`}
       >
         {/* Card content — dimmed when sold */}
         <div className={`w-full h-full transition-all duration-300 ${isSold ? 'opacity-40 grayscale' : ''}`}>
