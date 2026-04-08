@@ -171,7 +171,24 @@ class CardListSerializer(serializers.ModelSerializer):
     
     set_name = serializers.CharField(source='pokemon_set.name', read_only=True)
     set_code = serializers.CharField(source='pokemon_set.set_code', read_only=True)
-    
+    image = serializers.SerializerMethodField()
+
+    def get_image(self, obj):
+        """Always return the highest-resolution TCGDex image available."""
+        if not obj.image:
+            return obj.image
+        img = obj.image
+        # Upgrade any TCGDex URL to high quality
+        if 'tcgdex.net' in img:
+            # Strip existing quality suffix so we can replace it
+            for suffix in ('/high.webp', '/low.webp', '/medium.webp', '/high.png', '/low.png'):
+                if img.endswith(suffix):
+                    img = img[: -len(suffix)]
+                    break
+            if not img.endswith(('.jpg', '.png', '.webp')):
+                return img + '/high.webp'
+        return img
+
     class Meta:
         model = Card
         fields = ['id', 'name', 'card_number', 'set_name', 'set_code', 'rarity', 'card_type', 'image']
