@@ -223,14 +223,7 @@ function CardInspectOverlay({ item, onClose }: { item: InventoryItem; onClose: (
           )}
         </div>
 
-        {item.card_detail?.name && (
-          <p
-            className="text-center text-white/70 font-bold text-sm mt-5 tracking-wide"
-            style={{ opacity: mounted ? 1 : 0, transition: 'opacity 0.4s ease 0.2s' }}
-          >
-            {item.card_detail.name}
-          </p>
-        )}
+
       </div>
     </div>
   )
